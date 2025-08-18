@@ -1,4 +1,4 @@
-// app.js - Main entry point (simple & clean)
+// app.js - Main entry point (FIXED STATIC FILES)
 const express = require('express');
 const path = require('path');
 
@@ -9,9 +9,12 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 // Middleware
-app.use(express.static('public'));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// FIXED: Serve static files at the correct path for nodetest
+app.use('/nodetest', express.static('public'));
+app.use('/', express.static('public')); // Fallback for root access
 
 // Routes
 app.use('/', routes);
@@ -28,6 +31,7 @@ app.use((error, req, res, next) => {
 
 // 404 handler
 app.use((req, res) => {
+    console.log(`404 for path: ${req.path}`);
     res.status(404).json({
         error: 'Not found',
         path: req.path,
@@ -37,10 +41,11 @@ app.use((req, res) => {
 
 // Start server
 app.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
-    console.log(`Dashboard available at: http://localhost:${PORT}/nodetest`);
+    console.log(`✅ Server running on port ${PORT}`);
+    console.log(`📊 Dashboard: http://localhost:${PORT}/nodetest`);
+    console.log(`📁 Static files served from: /nodetest/css/ and /nodetest/js/`);
 }).on('error', (err) => {
-    console.error('Server failed to start:', err);
+    console.error('❌ Server failed to start:', err);
     process.exit(1);
 });
 

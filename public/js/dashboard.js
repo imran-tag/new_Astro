@@ -65,44 +65,73 @@ function loadUrgent() {
             const tbody = document.getElementById('urgent-table');
             
             if (urgent.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="8" class="px-6 py-4 text-center text-gray-500">Aucune intervention urgente</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="7" class="px-6 py-4 text-center text-gray-500">Aucune intervention nécessitant une assignation (48h)</td></tr>';
                 return;
             }
             
             tbody.innerHTML = urgent.map(item => {
-                const fullDescription = item.description || '';
-                const truncatedDescription = fullDescription.length > 50 ? fullDescription.substring(0, 50) + '...' : fullDescription;
-                
                 const statusClass = getStatusClass(item.status);
                 const statusIcon = getStatusIconHtml(item.status);
                 
-                const rowClass = item.hours_remaining < 24 ? 'urgent-row' : 'hover:bg-gray-50';
-                const timeClass = item.hours_remaining < 24 ? 'text-red-600 font-bold' : 'text-gray-900';
-                const timeText = item.hours_remaining > 0 ? Math.round(item.hours_remaining) + 'h' : 'En retard';
+                // Format hours remaining with visual urgency
+                const hoursRemaining = parseInt(item.hours_remaining) || 0;
+                let timeDisplay = '';
+                let rowClass = '';
                 
-                return '<tr class="' + rowClass + '">' +
-                    '<td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-blue-600">' + (item.intervention_id || '-') + '</td>' +
-                    '<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">' + (item.title || '-') + '</td>' +
-                    '<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">' + (item.address || '-') + '</td>' +
-                    '<td class="px-6 py-4 text-sm text-gray-900 max-w-xs">' +
-                        '<div class="relative group">' +
-                            '<div class="truncate cursor-help">' + truncatedDescription + '</div>' +
-                            '<div class="tooltip">' + fullDescription + '</div>' +
-                        '</div>' +
-                    '</td>' +
-                    '<td class="px-6 py-4 whitespace-nowrap">' +
-                        '<span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full ' + statusClass + '">' + statusIcon + item.status + '</span>' +
-                    '</td>' +
-                    '<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">' + (item.priority || 'Normale') + '</td>' +
-                    '<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">' + (item.date_time || '-') + '</td>' +
-                    '<td class="px-6 py-4 whitespace-nowrap text-sm ' + timeClass + '">' + timeText + '</td>' +
-                    '<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">' + (item.assigned_to || 'Non assigné') + '</td>' +
-                '</tr>';
+                if (hoursRemaining <= 0) {
+                    timeDisplay = '<span class="text-red-600 font-bold">⚠️ EXPIRÉ</span>';
+                    rowClass = 'bg-red-50 border-l-4 border-red-500';
+                } else if (hoursRemaining <= 6) {
+                    timeDisplay = `<span class="text-red-600 font-bold">🔥 ${hoursRemaining}h</span>`;
+                    rowClass = 'bg-red-50 border-l-4 border-red-400';
+                } else if (hoursRemaining <= 12) {
+                    timeDisplay = `<span class="text-orange-600 font-semibold">⚡ ${hoursRemaining}h</span>`;
+                    rowClass = 'bg-orange-50 border-l-4 border-orange-400';
+                } else if (hoursRemaining <= 24) {
+                    timeDisplay = `<span class="text-yellow-600 font-semibold">⏳ ${hoursRemaining}h</span>`;
+                    rowClass = 'bg-yellow-50 border-l-4 border-yellow-400';
+                } else {
+                    timeDisplay = `<span class="text-green-600">✅ ${hoursRemaining}h</span>`;
+                    rowClass = 'bg-green-50 border-l-4 border-green-400';
+                }
+                
+                // Format missing info with icons
+                let missingDisplay = '';
+                switch(item.missing_info) {
+                    case 'Technicien et Date manquants':
+                        missingDisplay = '<span class="text-red-600 font-bold">👤📅 Technicien + Date</span>';
+                        break;
+                    case 'Technicien manquant':
+                        missingDisplay = '<span class="text-orange-600 font-semibold">👤 Technicien</span>';
+                        break;
+                    case 'Date manquante':
+                        missingDisplay = '<span class="text-yellow-600 font-semibold">📅 Date</span>';
+                        break;
+                    default:
+                        missingDisplay = '<span class="text-green-600">✅ Complet</span>';
+                }
+                
+                return `
+                    <tr class="hover:bg-gray-50 ${rowClass}">
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-blue-600">${item.intervention_id || '-'}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${item.title || '-'}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${item.address || '-'}</td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${statusClass}">
+                                ${statusIcon} ${item.status || '-'}
+                            </span>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">${missingDisplay}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">${timeDisplay}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${item.assigned_to || 'Non assigné'}</td>
+                    </tr>
+                `;
             }).join('');
         })
         .catch(error => {
             console.error('Impossible de charger les interventions urgentes:', error);
-            document.getElementById('urgent-table').innerHTML = '<tr><td colspan="8" class="px-6 py-4 text-center text-red-500">Échec du chargement des données</td></tr>';
+            const tbody = document.getElementById('urgent-table');
+            tbody.innerHTML = '<tr><td colspan="7" class="px-6 py-4 text-center text-red-500">Erreur de chargement</td></tr>';
         });
 }
 
@@ -119,94 +148,65 @@ function loadRecent() {
             
             tbody.innerHTML = recent.map(item => {
                 const fullDescription = item.description || '';
-                const truncatedDescription = fullDescription.length > 50 ? fullDescription.substring(0, 50) + '...' : fullDescription;
+                const truncatedDescription = fullDescription.length > 50 ? 
+                    fullDescription.substring(0, 50) + '...' : fullDescription;
                 
                 const statusClass = getStatusClass(item.status);
                 const statusIcon = getStatusIconHtml(item.status);
                 
-                return '<tr class="hover:bg-gray-50">' +
-                    '<td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-blue-600">' + (item.intervention_id || '-') + '</td>' +
-                    '<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">' + (item.title || '-') + '</td>' +
-                    '<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">' + (item.address || '-') + '</td>' +
-                    '<td class="px-6 py-4 text-sm text-gray-900 max-w-xs">' +
-                        '<div class="relative group">' +
-                            '<div class="truncate cursor-help">' + truncatedDescription + '</div>' +
-                            '<div class="tooltip">' + fullDescription + '</div>' +
-                        '</div>' +
-                    '</td>' +
-                    '<td class="px-6 py-4 whitespace-nowrap">' +
-                        '<span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full ' + statusClass + '">' + statusIcon + item.status + '</span>' +
-                    '</td>' +
-                    '<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">' + (item.priority || 'Normale') + '</td>' +
-                    '<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">' + (item.date_time || '-') + '</td>' +
-                    '<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">' + (item.assigned_to || 'Non assigné') + '</td>' +
-                '</tr>';
+                return `
+                    <tr class="hover:bg-gray-50">
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-blue-600">${item.intervention_id || '-'}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${item.title || '-'}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${item.address || '-'}</td>
+                        <td class="px-6 py-4 text-sm text-gray-900 max-w-xs">
+                            <div class="relative group">
+                                <div class="truncate cursor-help">${truncatedDescription}</div>
+                                <div class="tooltip">${fullDescription}</div>
+                            </div>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${statusClass}">
+                                ${statusIcon} ${item.status || '-'}
+                            </span>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${item.priority || '-'}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${formatDate(item.date_time) || '-'}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${item.assigned_to || 'Non assigné'}</td>
+                    </tr>
+                `;
             }).join('');
         })
         .catch(error => {
             console.error('Impossible de charger les interventions récentes:', error);
-            document.getElementById('recent-table').innerHTML = '<tr><td colspan="8" class="px-6 py-4 text-center text-red-500">Échec du chargement des données</td></tr>';
+            const tbody = document.getElementById('recent-table');
+            tbody.innerHTML = '<tr><td colspan="8" class="px-6 py-4 text-center text-red-500">Erreur de chargement</td></tr>';
         });
 }
 
 // ============================================
-// Status and Icon Helper Functions
+// Filter Functions
 // ============================================
 
-function getStatusClass(status) {
-    const statusLower = status.toLowerCase();
-    if (statusLower.includes('terminé') || statusLower.includes('completed')) {
-        return 'status-completed';
-    } else if (statusLower.includes('cours') || statusLower.includes('progress')) {
-        return 'status-in-progress';
-    } else if (statusLower.includes('assigné') || statusLower.includes('assigned') || statusLower.includes('planifié')) {
-        return 'status-assigned';
-    } else if (statusLower.includes('facturé') || statusLower.includes('billed')) {
-        return 'status-billed';
-    } else if (statusLower.includes('payé') || statusLower.includes('paid')) {
-        return 'status-paid';
-    } else {
-        return 'status-received';
-    }
-}
-
-function getStatusIconHtml(status) {
-    const statusLower = status.toLowerCase();
-    if (statusLower.includes('planifié') || statusLower.includes('assigned')) {
-        return '<i class="fa fa-calendar" style="margin-right: 6px; color: #3b82f6;"></i>';
-    } else if (statusLower.includes('cours') || statusLower.includes('progress')) {
-        return '<i class="fa fa-arrow-circle-o-right" style="margin-right: 6px; color: #f59e0b;"></i>';
-    } else if (statusLower.includes('terminé') || statusLower.includes('completed')) {
-        return '<i class="fa fa-check" style="margin-right: 6px; color: #10b981;"></i>';
-    } else if (statusLower.includes('facturé') || statusLower.includes('billed')) {
-        return '<i class="fa fa-euro" style="margin-right: 6px; color: #6b7280;"></i>';
-    } else if (statusLower.includes('payé') || statusLower.includes('paid')) {
-        return '<i class="fa fa-check-circle" style="margin-right: 6px; color: #059669;"></i>';
-    } else {
-        return '<i class="fa fa-clock-o" style="margin-right: 6px; color: #eab308;"></i>';
-    }
-}
-
-// ============================================
-// Filtering Functions
-// ============================================
-
-function filterByStatus(status) {
-    // Remove active class from all tiles
+function filterInterventions(status) {
+    // Remove active class from all cards
     document.querySelectorAll('.stat-card').forEach(card => {
         card.classList.remove('active');
     });
     
-    // Add active class to clicked tile
-    event.currentTarget.classList.add('active');
+    // Add active class to clicked card
+    const clickedCard = document.querySelector(`[onclick="filterInterventions('${status}')"]`);
+    if (clickedCard) {
+        clickedCard.classList.add('active');
+    }
     
+    // Set current filter
     currentFilter = status;
     
     // Show filtered section
-    const filteredSection = document.getElementById('filtered-section');
-    filteredSection.style.display = 'block';
+    document.getElementById('filtered-section').style.display = 'block';
     
-    // Update title and icon
+    // Update title
     const titles = {
         'received': { text: 'Interventions Reçues', color: '#eab308', icon: 'fa-clock-o' },
         'assigned': { text: 'Interventions Assignées', color: '#3b82f6', icon: 'fa-calendar' },
@@ -219,12 +219,11 @@ function filterByStatus(status) {
     const titleInfo = titles[status];
     if (titleInfo) {
         document.getElementById('filtered-title').innerHTML = 
-            '<i class="' + titleInfo.icon + ' w-3 h-3 mr-2" style="color: ' + titleInfo.color + ';"></i>' +
-            titleInfo.text;
+            `<i class="${titleInfo.icon} w-3 h-3 mr-2" style="color: ${titleInfo.color};"></i>${titleInfo.text}`;
     }
     
     // Load filtered interventions
-    fetch('/nodetest/api/interventions/' + status)
+    fetch(`/nodetest/api/interventions/${status}`)
         .then(response => response.json())
         .then(interventions => {
             const tbody = document.getElementById('filtered-table');
@@ -236,44 +235,52 @@ function filterByStatus(status) {
             
             tbody.innerHTML = interventions.map(item => {
                 const fullDescription = item.description || '';
-                const truncatedDescription = fullDescription.length > 50 ? fullDescription.substring(0, 50) + '...' : fullDescription;
+                const truncatedDescription = fullDescription.length > 50 ? 
+                    fullDescription.substring(0, 50) + '...' : fullDescription;
                 
                 const statusClass = getStatusClass(item.status);
                 const statusIcon = getStatusIconHtml(item.status);
                 
-                return '<tr class="hover:bg-gray-50">' +
-                    '<td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-blue-600">' + (item.intervention_id || '-') + '</td>' +
-                    '<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">' + (item.title || '-') + '</td>' +
-                    '<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">' + (item.address || '-') + '</td>' +
-                    '<td class="px-6 py-4 text-sm text-gray-900 max-w-xs">' +
-                        '<div class="relative group">' +
-                            '<div class="truncate cursor-help">' + truncatedDescription + '</div>' +
-                            '<div class="tooltip">' + fullDescription + '</div>' +
-                        '</div>' +
-                    '</td>' +
-                    '<td class="px-6 py-4 whitespace-nowrap">' +
-                        '<span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full ' + statusClass + '">' + statusIcon + item.status + '</span>' +
-                    '</td>' +
-                    '<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">' + (item.priority || 'Normale') + '</td>' +
-                    '<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">' + (item.date_time || '-') + '</td>' +
-                    '<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">' + (item.assigned_to || 'Non assigné') + '</td>' +
-                '</tr>';
+                return `
+                    <tr class="hover:bg-gray-50">
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-blue-600">${item.intervention_id || '-'}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${item.title || '-'}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${item.address || '-'}</td>
+                        <td class="px-6 py-4 text-sm text-gray-900 max-w-xs">
+                            <div class="relative group">
+                                <div class="truncate cursor-help">${truncatedDescription}</div>
+                                <div class="tooltip">${fullDescription}</div>
+                            </div>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${statusClass}">
+                                ${statusIcon} ${item.status || '-'}
+                            </span>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${item.priority || '-'}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${formatDate(item.date_time) || '-'}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${item.assigned_to || 'Non assigné'}</td>
+                    </tr>
+                `;
             }).join('');
         })
         .catch(error => {
             console.error('Impossible de charger les interventions filtrées:', error);
-            document.getElementById('filtered-table').innerHTML = '<tr><td colspan="8" class="px-6 py-4 text-center text-red-500">Échec du chargement des données</td></tr>';
+            const tbody = document.getElementById('filtered-table');
+            tbody.innerHTML = '<tr><td colspan="8" class="px-6 py-4 text-center text-red-500">Erreur de chargement</td></tr>';
         });
 }
 
 function clearFilter() {
-    // Remove active class from all tiles
+    // Remove active class from all cards
     document.querySelectorAll('.stat-card').forEach(card => {
         card.classList.remove('active');
     });
     
     // Hide filtered section
     document.getElementById('filtered-section').style.display = 'none';
+    
+    // Clear current filter
     currentFilter = null;
 }
 
@@ -281,35 +288,94 @@ function clearFilter() {
 // Utility Functions
 // ============================================
 
-// Format date for display
+function getStatusClass(status) {
+    const statusClasses = {
+        // Basic statuses
+        'Reçue': 'status-received',
+        'Assignée': 'status-assigned',
+        'Planifiée': 'status-assigned',
+        'En cours': 'status-in-progress',
+        'Terminée': 'status-completed',
+        'Facturée': 'status-billed',
+        'Payée': 'status-paid',
+        
+        // Maintenance types with distinct colors
+        'Maintenance SCH': 'bg-purple-100 text-purple-800 border border-purple-300',
+        'Maintenance VIVEST': 'bg-purple-100 text-purple-800 border border-purple-300',
+        'Maintenance Moselis': 'bg-purple-100 text-purple-800 border border-purple-300',
+        'Maintenance CDC': 'bg-purple-100 text-purple-800 border border-purple-300',
+        'Maintenance CDC Habitat': 'bg-purple-100 text-purple-800 border border-purple-300',
+        'CHANTIER': 'bg-purple-100 text-purple-800 border border-purple-300',
+        
+        // Other statuses
+        'Pausée': 'bg-gray-100 text-gray-800',
+        'Annulée': 'bg-red-100 text-red-800'
+    };
+    return statusClasses[status] || 'bg-purple-100 text-purple-800 border border-purple-300';
+}
+
+function getStatusIconHtml(status) {
+    const statusIcons = {
+        // Basic statuses
+        'Reçue': '<i class="fa fa-clock-o mr-1"></i>',
+        'Assignée': '<i class="fa fa-calendar mr-1"></i>',
+        'Planifiée': '<i class="fa fa-calendar-check-o mr-1"></i>',
+        'En cours': '<i class="fa fa-cog fa-spin mr-1"></i>',
+        'Terminée': '<i class="fa fa-check-circle mr-1"></i>',
+        'Facturée': '<i class="fa fa-euro mr-1"></i>',
+        'Payée': '<i class="fa fa-check-circle-o mr-1"></i>',
+        
+        // Maintenance types with unique icons
+        'Maintenance SCH': '<i class="fa fa-building mr-1" style="color: #8b5cf6;"></i>',
+        'Maintenance VIVEST': '<i class="fa fa-home mr-1" style="color: #8b5cf6;"></i>',
+        'Maintenance Moselis': '<i class="fa fa-cogs mr-1" style="color: #8b5cf6;"></i>',
+        'Maintenance CDC': '<i class="fa fa-wrench mr-1" style="color: #8b5cf6;"></i>',
+        'Maintenance CDC Habitat': '<i class="fa fa-wrench mr-1" style="color: #8b5cf6;"></i>',
+        'CHANTIER': '<i class="fa fa-hard-hat mr-1" style="color: #8b5cf6;"></i>',
+        
+        // Other statuses
+        'Pausée': '<i class="fa fa-pause mr-1"></i>',
+        'Annulée': '<i class="fa fa-times-circle mr-1"></i>'
+    };
+    return statusIcons[status] || '<i class="fa fa-home mr-1" style="color: #8b5cf6;"></i>';
+}
+
 function formatDate(dateString) {
-    if (!dateString) return '-';
+    if (!dateString) return '';
     
     try {
+        // Handle French date format (dd/mm/yyyy)
+        if (dateString.includes('/')) {
+            const parts = dateString.split('/');
+            if (parts.length === 3) {
+                const day = parts[0];
+                const month = parts[1];
+                const year = parts[2];
+                // Create date as yyyy-mm-dd format for proper parsing
+                const date = new Date(`${year}-${month}-${day}`);
+                if (!isNaN(date.getTime())) {
+                    return date.toLocaleDateString('fr-FR', {
+                        day: '2-digit',
+                        month: '2-digit',
+                        year: 'numeric'
+                    });
+                }
+            }
+        }
+        
+        // Fallback for other date formats
         const date = new Date(dateString);
-        return date.toLocaleDateString('fr-FR');
+        if (!isNaN(date.getTime())) {
+            return date.toLocaleDateString('fr-FR', {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric'
+            });
+        }
+        
+        // If all else fails, return the original string
+        return dateString;
     } catch (error) {
-        return dateString; // Return original if parsing fails
+        return dateString;
     }
 }
-
-// Add smooth scroll to elements
-function smoothScrollTo(elementId) {
-    const element = document.getElementById(elementId);
-    if (element) {
-        element.scrollIntoView({ 
-            behavior: 'smooth',
-            block: 'start'
-        });
-    }
-}
-
-// Show notification (for future use)
-function showNotification(message, type = 'info') {
-    // This could be expanded to show toast notifications
-    console.log(`${type.toUpperCase()}: ${message}`);
-}
-
-// Export functions for global access (if needed)
-window.filterByStatus = filterByStatus;
-window.clearFilter = clearFilter;

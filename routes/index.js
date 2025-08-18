@@ -1,7 +1,8 @@
-// routes/index.js - Main route organization
+// routes/index.js - Main route organization (FIXED)
 const express = require('express');
 const router = express.Router();
 const { getDashboardHTML } = require('../views/dashboard');
+const { getUrgentInterventionsHTML } = require('../views/urgentInterventions');
 
 // Import API routes
 const apiRoutes = require('./api');
@@ -18,6 +19,12 @@ router.get('/nodetest', (req, res) => {
 
 router.get('/nodetest/', (req, res) => {
     res.redirect('/nodetest');
+});
+
+// Urgent interventions page - THIS WAS MISSING
+router.get('/nodetest/urgent', (req, res) => {
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.send(getUrgentInterventionsHTML());
 });
 
 // API routes
