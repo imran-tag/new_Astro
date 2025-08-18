@@ -1,4 +1,4 @@
-// controllers/interventionsController.js - FIXED with all endpoints
+// controllers/interventionsController.js - FIXED for Node.js v12
 const { pool } = require('../config/database');
 const { buildInterventionQuery, buildUrgentAllQuery } = require('../utils/queryBuilder');
 
@@ -90,7 +90,7 @@ exports.getUrgentAll = async (req, res) => {
         try {
             // Get total count
             const [countResult] = await connection.execute(countQuery);
-            const totalCount = countResult[0]?.total_count || 0;
+            const totalCount = countResult[0] && countResult[0].total_count ? countResult[0].total_count : 0;
 
             // Get results
             const [results] = await connection.execute(query);
@@ -105,7 +105,7 @@ exports.getUrgentAll = async (req, res) => {
                 pagination: {
                     currentPage: parseInt(page),
                     totalPages,
-                    totalCount,
+                    totalPages,
                     hasNextPage,
                     hasPrevPage,
                     limit: parseInt(limit)

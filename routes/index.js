@@ -1,4 +1,4 @@
-// routes/index.js - Main route organization (FIXED)
+// routes/index.js - Main route organization (FIXED for Node.js v12)
 const express = require('express');
 const router = express.Router();
 const { getDashboardHTML } = require('../views/dashboard');
@@ -21,7 +21,7 @@ router.get('/nodetest/', (req, res) => {
     res.redirect('/nodetest');
 });
 
-// Urgent interventions page - THIS WAS MISSING
+// Urgent interventions page
 router.get('/nodetest/urgent', (req, res) => {
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
     res.send(getUrgentInterventionsHTML());

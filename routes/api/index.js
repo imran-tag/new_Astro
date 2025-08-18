@@ -1,4 +1,4 @@
-// routes/api/index.js - API route organization (FIXED)
+// routes/api/index.js - API route organization (FIXED for Node.js v12)
 const express = require('express');
 const router = express.Router();
 
@@ -14,7 +14,7 @@ router.get('/urgent', interventionsController.getUrgent);
 router.get('/recent', interventionsController.getRecent);
 router.get('/interventions/:status?', interventionsController.getFiltered);
 
-// New urgent interventions API with pagination - THIS WAS MISSING
+// Urgent interventions API with pagination
 router.get('/urgent-all', interventionsController.getUrgentAll);
 
 module.exports = router;

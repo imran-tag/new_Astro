@@ -1,4 +1,4 @@
-// views/dashboard.js - HTML template (FIXED PATHS FOR PRODUCTION)
+// views/dashboard.js - Enhanced HTML template with colors, icons, and tooltips
 
 function getDashboardHTML() {
     return `<!DOCTYPE html>
@@ -6,7 +6,7 @@ function getDashboardHTML() {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Tableau de Bord - Interventions Techniques</title>
+    <title>Tableau de Bord - ASTRO TECH</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <link rel="stylesheet" href="/nodetest/css/dashboard.css">
@@ -30,7 +30,7 @@ function getHeaderHTML() {
                             <span class="text-white font-bold text-lg">TI</span>
                         </div>
                         <div>
-                            <h1 class="text-xl font-bold text-gray-900">Interventions Techniques</h1>
+                            <h1 class="text-xl font-bold text-gray-900">ASTRO TECH</h1>
                             <p class="text-sm text-gray-500">Tableau de bord</p>
                         </div>
                     </div>
@@ -57,12 +57,12 @@ function getMainContentHTML() {
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6 mb-8">
             <!-- Reçues -->
             <div class="stat-card" onclick="filterInterventions('received')">
-                <div class="bg-white overflow-hidden shadow rounded-lg border border-yellow-200">
+                <div class="bg-white overflow-hidden shadow rounded-lg border border-yellow-200 hover:border-yellow-400 transition-all">
                     <div class="p-5">
                         <div class="flex items-center">
                             <div class="flex-shrink-0">
                                 <div class="w-8 h-8 bg-yellow-500 rounded-full flex items-center justify-center">
-                                    <i class="fas fa-clock text-white text-sm"></i>
+                                    <i class="fas fa-inbox text-white text-sm"></i>
                                 </div>
                             </div>
                             <div class="ml-5 w-0 flex-1">
@@ -78,12 +78,12 @@ function getMainContentHTML() {
 
             <!-- Assignées -->
             <div class="stat-card" onclick="filterInterventions('assigned')">
-                <div class="bg-white overflow-hidden shadow rounded-lg border border-blue-200">
+                <div class="bg-white overflow-hidden shadow rounded-lg border border-blue-200 hover:border-blue-400 transition-all">
                     <div class="p-5">
                         <div class="flex items-center">
                             <div class="flex-shrink-0">
                                 <div class="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center">
-                                    <i class="fas fa-calendar text-white text-sm"></i>
+                                    <i class="fas fa-user-tag text-white text-sm"></i>
                                 </div>
                             </div>
                             <div class="ml-5 w-0 flex-1">
@@ -99,12 +99,12 @@ function getMainContentHTML() {
 
             <!-- En Cours -->
             <div class="stat-card" onclick="filterInterventions('in-progress')">
-                <div class="bg-white overflow-hidden shadow rounded-lg border border-orange-200">
+                <div class="bg-white overflow-hidden shadow rounded-lg border border-purple-200 hover:border-purple-400 transition-all">
                     <div class="p-5">
                         <div class="flex items-center">
                             <div class="flex-shrink-0">
-                                <div class="w-8 h-8 bg-orange-500 rounded-full flex items-center justify-center">
-                                    <i class="fas fa-cog text-white text-sm"></i>
+                                <div class="w-8 h-8 bg-purple-500 rounded-full flex items-center justify-center">
+                                    <i class="fas fa-cogs text-white text-sm"></i>
                                 </div>
                             </div>
                             <div class="ml-5 w-0 flex-1">
@@ -120,7 +120,7 @@ function getMainContentHTML() {
 
             <!-- Terminées -->
             <div class="stat-card" onclick="filterInterventions('completed')">
-                <div class="bg-white overflow-hidden shadow rounded-lg border border-green-200">
+                <div class="bg-white overflow-hidden shadow rounded-lg border border-green-200 hover:border-green-400 transition-all">
                     <div class="p-5">
                         <div class="flex items-center">
                             <div class="flex-shrink-0">
@@ -141,11 +141,11 @@ function getMainContentHTML() {
 
             <!-- Facturées -->
             <div class="stat-card" onclick="filterInterventions('billed')">
-                <div class="bg-white overflow-hidden shadow rounded-lg border border-purple-200">
+                <div class="bg-white overflow-hidden shadow rounded-lg border border-gray-200 hover:border-gray-400 transition-all">
                     <div class="p-5">
                         <div class="flex items-center">
                             <div class="flex-shrink-0">
-                                <div class="w-8 h-8 bg-purple-500 rounded-full flex items-center justify-center">
+                                <div class="w-8 h-8 bg-gray-500 rounded-full flex items-center justify-center">
                                     <i class="fas fa-file-invoice text-white text-sm"></i>
                                 </div>
                             </div>
@@ -162,12 +162,12 @@ function getMainContentHTML() {
 
             <!-- Payées -->
             <div class="stat-card" onclick="filterInterventions('paid')">
-                <div class="bg-white overflow-hidden shadow rounded-lg border border-indigo-200">
+                <div class="bg-white overflow-hidden shadow rounded-lg border border-emerald-200 hover:border-emerald-400 transition-all">
                     <div class="p-5">
                         <div class="flex items-center">
                             <div class="flex-shrink-0">
-                                <div class="w-8 h-8 bg-indigo-500 rounded-full flex items-center justify-center">
-                                    <i class="fas fa-money-check text-white text-sm"></i>
+                                <div class="w-8 h-8 bg-emerald-500 rounded-full flex items-center justify-center">
+                                    <i class="fas fa-money-check-alt text-white text-sm"></i>
                                 </div>
                             </div>
                             <div class="ml-5 w-0 flex-1">
@@ -182,14 +182,15 @@ function getMainContentHTML() {
             </div>
         </div>
 
-        <!-- Section Interventions Filtrées (moved to top, shows when filter is active) -->
-        <div id="filtered-section" style="display: none;" class="mb-8">
+        <!-- Section Interventions Filtrées (cachée initialement) -->
+        <div id="filtered-section" class="mb-8 hidden">
             <div class="flex justify-between items-center mb-4">
-                <h2 id="filtered-title" class="text-2xl font-semibold text-gray-900 flex items-center">
-                    Interventions Filtrées
+                <h2 class="text-2xl font-semibold text-gray-900 flex items-center">
+                    <span class="w-3 h-3 bg-indigo-500 rounded-full mr-2"></span>
+                    <span id="filtered-title">Interventions Filtrées</span>
                 </h2>
                 <button class="btn-secondary text-sm" onclick="clearFilter()">
-                    Effacer le Filtre
+                    <i class="fa fa-times mr-2"></i>Effacer le Filtre
                 </button>
             </div>
             <div class="bg-white rounded-lg shadow overflow-hidden border border-gray-200">
@@ -227,7 +228,7 @@ function getMainContentHTML() {
                 <div class="flex items-center space-x-2">
                     <span class="text-sm text-gray-500">📋 Manque technicien ou date</span>
                     <a href="/nodetest/urgent" class="btn-primary text-sm">
-                        Voir Tout
+                        <i class="fa fa-eye mr-2"></i>Voir Tout
                     </a>
                 </div>
             </div>
@@ -262,8 +263,8 @@ function getMainContentHTML() {
                     <span class="w-3 h-3 bg-blue-500 rounded-full mr-2"></span>
                     Interventions Récentes
                 </h2>
-                <button class="btn-primary text-sm">
-                    Voir Tout
+                <button class="btn-primary text-sm" onclick="loadAllRecent()">
+                    <i class="fa fa-list mr-2"></i>Voir Tout
                 </button>
             </div>
             <div class="bg-white rounded-lg shadow overflow-hidden border border-blue-200">

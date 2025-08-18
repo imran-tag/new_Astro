@@ -1,4 +1,4 @@
-// utils/queryBuilder.js - SQL query organization (FIXED: use number instead of public_number)
+// utils/queryBuilder.js - SQL query organization (FIXED)
 
 const baseInterventionFields = `
     i.number as intervention_id,
@@ -77,37 +77,26 @@ function buildInterventionQuery(type, status = null) {
                         NOW()
                     ) <= 48
                 ELSE 
-                    -- Business day creation: check if within 48 business hours
+                    -- Business days: exclude weekends from hour calculation
                     (TIMESTAMPDIFF(HOUR, i.timestamp, NOW()) - 
                      (FLOOR(TIMESTAMPDIFF(HOUR, i.timestamp, NOW()) / 24) * 
                       CASE WHEN WEEKDAY(DATE_ADD(i.timestamp, INTERVAL FLOOR(TIMESTAMPDIFF(HOUR, i.timestamp, NOW()) / 24) DAY)) IN (5, 6) THEN 24 ELSE 0 END)
                     ) <= 48
             END
             AND
-            -- Include planifiées and maintenance types
-            (ist.name LIKE '%planifi%' OR ist.name LIKE '%maintenance%' OR ist.name LIKE '%CDC%' OR ist.name LIKE '%SCH%' OR ist.name LIKE '%MOSELIS%' OR ist.name LIKE '%VIVEST%')
+            -- Only include specific statuses
+            (ist.name LIKE '%planifi%' OR ist.name LIKE '%maintenance%' OR ist.name LIKE '%CDC%' OR ist.name LIKE '%SCH%' OR ist.name LIKE '%MOSELIS%' OR ist.name LIKE '%VIVEST%' OR ist.name = 'Reçue' OR ist.name = 'Assignée')
         )`;
-    }
-    
-    // Add status filtering
-    if (type === 'filtered' && status) {
+        query += ` ORDER BY hours_remaining ASC, i.uid DESC LIMIT 10`;
+    } else if (type === 'recent') {
+        query += ` AND i.timestamp >= DATE_SUB(NOW(), INTERVAL 7 DAY)`;
+        query += ` ORDER BY i.timestamp DESC LIMIT 10`;
+    } else if (type === 'filtered' && status) {
         const statusCondition = getStatusCondition(status);
         if (statusCondition) {
             query += ` AND ${statusCondition}`;
         }
-    }
-    
-    // Add ordering and limits - ALWAYS sort by date
-    if (type === 'urgent') {
-        query += ` ORDER BY 
-            hours_remaining ASC,
-            STR_TO_DATE(i.date_time, '%d/%m/%Y') DESC,
-            i.uid DESC LIMIT 20`;
-    } else {
-        // For recent and filtered interventions, sort by date_time (most recent first)
-        query += ` ORDER BY 
-            STR_TO_DATE(i.date_time, '%d/%m/%Y') DESC,
-            i.uid DESC LIMIT ${type === 'filtered' ? '50' : '10'}`;
+        query += ` ORDER BY i.timestamp DESC LIMIT ${status === 'urgent' ? '50' : '10'}`;
     }
     
     return query;
@@ -146,7 +135,7 @@ function buildUrgentAllQuery(filters) {
 
     let baseQuery = `SELECT ${baseInterventionFields}`;
     
-    // Add hours_remaining for urgent interventions
+    // Add hours_remaining calculation
     baseQuery += `, 
     CASE 
         WHEN WEEKDAY(i.timestamp) IN (5, 6) THEN 
@@ -187,59 +176,57 @@ function buildUrgentAllQuery(filters) {
                 ) <= 48
         END
         AND
-        (ist.name LIKE '%planifi%' OR ist.name LIKE '%maintenance%' OR ist.name LIKE '%CDC%' OR ist.name LIKE '%SCH%' OR ist.name LIKE '%MOSELIS%' OR ist.name LIKE '%VIVEST%')
+        (ist.name LIKE '%planifi%' OR ist.name LIKE '%maintenance%' OR ist.name LIKE '%CDC%' OR ist.name LIKE '%SCH%' OR ist.name LIKE '%MOSELIS%' OR ist.name LIKE '%VIVEST%' OR ist.name = 'Reçue' OR ist.name = 'Assignée')
     )`);
 
     // Search filter
-    if (search) {
+    if (search && search.trim() !== '') {
+        const searchTerm = search.trim();
         whereConditions.push(`(
-            i.number LIKE '%${search}%' OR 
-            i.title LIKE '%${search}%' OR 
-            i.address LIKE '%${search}%' OR 
-            i.city LIKE '%${search}%'
+            i.number LIKE '%${searchTerm}%' OR 
+            i.title LIKE '%${searchTerm}%' OR 
+            i.address LIKE '%${searchTerm}%' OR 
+            i.city LIKE '%${searchTerm}%' OR
+            i.description LIKE '%${searchTerm}%'
         )`);
     }
 
     // Status filter
-    if (status) {
+    if (status && status !== '') {
         switch(status) {
             case 'planifie':
-                whereConditions.push("ist.name LIKE '%planifi%'");
+                whereConditions.push("(ist.name LIKE '%planifi%')");
                 break;
-            case 'maintenance_cdc':
-                whereConditions.push("ist.name LIKE '%CDC%'");
+            case 'maintenance':
+                whereConditions.push("(ist.name LIKE '%maintenance%')");
                 break;
-            case 'maintenance_sch':
-                whereConditions.push("ist.name LIKE '%SCH%'");
+            case 'recu':
+                whereConditions.push("(ist.name = 'Reçue')");
                 break;
-            case 'maintenance_moselis':
-                whereConditions.push("ist.name LIKE '%MOSELIS%'");
-                break;
-            case 'maintenance_vivest':
-                whereConditions.push("ist.name LIKE '%VIVEST%'");
+            case 'assigne':
+                whereConditions.push("(ist.name = 'Assignée')");
                 break;
         }
     }
 
     // Missing info filter
-    if (missing) {
+    if (missing && missing !== '') {
         switch(missing) {
-            case 'both':
-                whereConditions.push("(i.technician_uid = 0 OR i.technician_uid IS NULL) AND (i.date_time IS NULL OR i.date_time = '')");
-                break;
             case 'technician':
-                whereConditions.push("(i.technician_uid = 0 OR i.technician_uid IS NULL) AND (i.date_time IS NOT NULL AND i.date_time != '')");
+                whereConditions.push("(i.technician_uid = 0 OR i.technician_uid IS NULL)");
                 break;
             case 'date':
-                whereConditions.push("(i.technician_uid != 0 AND i.technician_uid IS NOT NULL) AND (i.date_time IS NULL OR i.date_time = '')");
+                whereConditions.push("(i.date_time IS NULL OR i.date_time = '')");
+                break;
+            case 'both':
+                whereConditions.push("((i.technician_uid = 0 OR i.technician_uid IS NULL) AND (i.date_time IS NULL OR i.date_time = ''))");
                 break;
         }
     }
 
     // Time filter
-    if (timeFilter) {
-        const timeCondition = `
-        CASE 
+    if (timeFilter && timeFilter !== '') {
+        const timeCondition = `CASE 
             WHEN WEEKDAY(i.timestamp) IN (5, 6) THEN 
                 GREATEST(0, 48 - 
                     TIMESTAMPDIFF(HOUR, 

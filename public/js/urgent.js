@@ -58,8 +58,9 @@ function setupEventListeners() {
 }
 
 function loadUrgentInterventions() {
-    const pageSize = document.getElementById('page-size').value;
+    const pageSize = document.getElementById('page-size').value || 25;
     
+    // Build query parameters
     const params = new URLSearchParams({
         page: currentPage,
         limit: pageSize,
@@ -71,107 +72,147 @@ function loadUrgentInterventions() {
         sortOrder: currentSort.order
     });
 
+    // Fetch data
     fetch(`/nodetest/api/urgent-all?${params}`)
-        .then(response => response.json())
-        .then(result => {
-            displayInterventions(result.data);
-            updatePagination(result.pagination);
-            updateStats(result.pagination.totalCount);
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            displayInterventions(data.data || []);
+            updatePagination(data.pagination || {});
+            updateStats(data.pagination?.totalCount || 0);
         })
         .catch(error => {
             console.error('Error loading urgent interventions:', error);
-            const tbody = document.getElementById('urgent-table');
-            tbody.innerHTML = '<tr><td colspan="8" class="px-6 py-4 text-center text-red-500">Erreur de chargement des données</td></tr>';
+            displayError('Erreur lors du chargement des interventions urgentes: ' + error.message);
         });
 }
 
 function displayInterventions(interventions) {
-    const tbody = document.getElementById('urgent-table');
+    const tableBody = document.getElementById('urgent-table');
     
-    if (interventions.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="8" class="px-6 py-4 text-center text-gray-500">Aucune intervention trouvée</td></tr>';
+    if (!interventions || interventions.length === 0) {
+        tableBody.innerHTML = `
+            <tr>
+                <td colspan="8" class="px-6 py-8 text-center text-gray-500">
+                    <i class="fa fa-info-circle mr-2"></i>Aucune intervention urgente trouvée
+                </td>
+            </tr>
+        `;
         return;
     }
 
-    tbody.innerHTML = interventions.map(item => {
-        const statusClass = getStatusClass(item.status);
-        const statusIcon = getStatusIconHtml(item.status);
+    const rows = interventions.map(intervention => {
+        const timeClass = getTimeRemainingClass(intervention.hours_remaining || 0);
+        const statusClass = getStatusClass(intervention.status);
+        const missingClass = getMissingInfoClass(intervention.missing_info);
         
-        // Format hours remaining
-        const hoursRemaining = parseInt(item.hours_remaining) || 0;
-        let timeDisplay = '';
-        let rowClass = '';
-        
-        if (hoursRemaining <= 0) {
-            timeDisplay = '<span class="text-red-600 font-bold">⚠️ EXPIRÉ</span>';
-            rowClass = 'bg-red-50 border-l-4 border-red-500';
-        } else if (hoursRemaining <= 6) {
-            timeDisplay = `<span class="text-red-600 font-bold">🔥 ${hoursRemaining}h</span>`;
-            rowClass = 'bg-red-50 border-l-4 border-red-400';
-        } else if (hoursRemaining <= 12) {
-            timeDisplay = `<span class="text-orange-600 font-semibold">⚡ ${hoursRemaining}h</span>`;
-            rowClass = 'bg-orange-50 border-l-4 border-orange-400';
-        } else if (hoursRemaining <= 24) {
-            timeDisplay = `<span class="text-yellow-600 font-semibold">⏳ ${hoursRemaining}h</span>`;
-            rowClass = 'bg-yellow-50 border-l-4 border-yellow-400';
-        } else {
-            timeDisplay = `<span class="text-green-600">✅ ${hoursRemaining}h</span>`;
-            rowClass = 'bg-green-50 border-l-4 border-green-400';
-        }
-        
-        // Format missing info
-        let missingDisplay = '';
-        switch(item.missing_info) {
-            case 'Technicien et Date manquants':
-                missingDisplay = '<span class="text-red-600 font-bold">👤📅 Technicien + Date</span>';
-                break;
-            case 'Technicien manquant':
-                missingDisplay = '<span class="text-orange-600 font-semibold">👤 Technicien</span>';
-                break;
-            case 'Date manquante':
-                missingDisplay = '<span class="text-yellow-600 font-semibold">📅 Date</span>';
-                break;
-            default:
-                missingDisplay = '<span class="text-green-600">✅ Complet</span>';
-        }
-
         return `
-            <tr class="hover:bg-gray-50 ${rowClass}">
-                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-blue-600">${item.intervention_id || '-'}</td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${item.title || '-'}</td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${item.address || '-'}</td>
+            <tr class="hover:bg-gray-50 ${intervention.hours_remaining <= 0 ? 'urgent-row' : ''}">
+                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                    #${intervention.intervention_id || 'N/A'}
+                </td>
+                <td class="px-6 py-4 text-sm text-gray-900">
+                    <div class="max-w-xs truncate" title="${escapeHtml(intervention.title || '')}">
+                        ${escapeHtml(intervention.title || 'Sans titre')}
+                    </div>
+                </td>
+                <td class="px-6 py-4 text-sm text-gray-900">
+                    <div class="max-w-xs truncate" title="${escapeHtml(intervention.address || '')}">
+                        ${escapeHtml(intervention.address || 'Adresse non définie')}
+                    </div>
+                </td>
                 <td class="px-6 py-4 whitespace-nowrap">
                     <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${statusClass}">
-                        ${statusIcon} ${item.status || '-'}
+                        ${getStatusIconHtml(intervention.status)} ${escapeHtml(intervention.status || 'N/A')}
                     </span>
                 </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">${missingDisplay}</td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">${timeDisplay}</td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${item.assigned_to || 'Non assigné'}</td>
+                <td class="px-6 py-4 whitespace-nowrap">
+                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${missingClass}">
+                        ${getMissingIcon(intervention.missing_info)} ${escapeHtml(intervention.missing_info || 'N/A')}
+                    </span>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap">
+                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${timeClass}">
+                        ${getTimeIcon(intervention.hours_remaining || 0)} ${formatTimeRemaining(intervention.hours_remaining || 0)}
+                    </span>
+                </td>
+                <td class="px-6 py-4 text-sm text-gray-900">
+                    ${escapeHtml(intervention.assigned_to || 'Non assigné')}
+                </td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
                     <div class="flex space-x-2">
-                        <button onclick="assignTechnician('${item.intervention_id}')" class="text-blue-600 hover:text-blue-900" title="Assigner technicien">
-                            <i class="fa fa-user-plus"></i>
-                        </button>
-                        <button onclick="setDate('${item.intervention_id}')" class="text-green-600 hover:text-green-900" title="Définir date">
-                            <i class="fa fa-calendar-plus"></i>
-                        </button>
-                        <button onclick="viewDetails('${item.intervention_id}')" class="text-gray-600 hover:text-gray-900" title="Voir détails">
-                            <i class="fa fa-eye"></i>
-                        </button>
+                        ${getActionButtons(intervention)}
                     </div>
                 </td>
             </tr>
         `;
     }).join('');
+
+    tableBody.innerHTML = rows;
+}
+
+function getActionButtons(intervention) {
+    let buttons = [];
+    
+    // If technician is missing
+    if (!intervention.technician_uid || intervention.technician_uid == 0) {
+        buttons.push(`
+            <button onclick="assignTechnician('${intervention.intervention_id}')" 
+                    class="bg-blue-600 hover:bg-blue-700 text-white px-2 py-1 rounded text-xs">
+                <i class="fa fa-user-plus mr-1"></i>Assigner
+            </button>
+        `);
+    }
+    
+    // If date is missing
+    if (!intervention.date_time || intervention.date_time === '') {
+        buttons.push(`
+            <button onclick="setDate('${intervention.intervention_id}')" 
+                    class="bg-green-600 hover:bg-green-700 text-white px-2 py-1 rounded text-xs">
+                <i class="fa fa-calendar mr-1"></i>Date
+            </button>
+        `);
+    }
+    
+    // Always show details button
+    buttons.push(`
+        <button onclick="viewDetails('${intervention.intervention_id}')" 
+                class="bg-gray-600 hover:bg-gray-700 text-white px-2 py-1 rounded text-xs">
+            <i class="fa fa-eye mr-1"></i>Voir
+        </button>
+    `);
+    
+    return buttons.join('');
+}
+
+function displayError(message) {
+    const tableBody = document.getElementById('urgent-table');
+    tableBody.innerHTML = `
+        <tr>
+            <td colspan="8" class="px-6 py-8 text-center text-red-500">
+                <i class="fa fa-exclamation-triangle mr-2"></i>${escapeHtml(message)}
+            </td>
+        </tr>
+    `;
 }
 
 function updatePagination(pagination) {
-    const { currentPage, totalPages, totalCount, hasNextPage, hasPrevPage } = pagination;
-    
+    const {
+        currentPage = 1,
+        totalPages = 0,
+        totalCount = 0,
+        hasNextPage = false,
+        hasPrevPage = false,
+        limit = 25
+    } = pagination;
+
     // Update showing info
-    const start = totalCount === 0 ? 0 : ((currentPage - 1) * pagination.limit) + 1;
-    const end = Math.min(currentPage * pagination.limit, totalCount);
+    const start = totalCount === 0 ? 0 : ((currentPage - 1) * limit) + 1;
+    const end = Math.min(currentPage * limit, totalCount);
     
     document.getElementById('showing-start').textContent = start;
     document.getElementById('showing-end').textContent = end;
@@ -274,45 +315,93 @@ function viewDetails(interventionId) {
     // TODO: Open details modal or redirect to details page
 }
 
-// Status utility functions (reused from dashboard)
+// Utility functions
+function escapeHtml(unsafe) {
+    if (!unsafe) return '';
+    return unsafe
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+}
+
+function getTimeRemainingClass(hours) {
+    if (hours <= 0) return 'bg-red-100 text-red-800 border border-red-300';
+    if (hours <= 6) return 'bg-red-100 text-red-800 border border-red-300';
+    if (hours <= 12) return 'bg-orange-100 text-orange-800 border border-orange-300';
+    if (hours <= 24) return 'bg-yellow-100 text-yellow-800 border border-yellow-300';
+    return 'bg-green-100 text-green-800 border border-green-300';
+}
+
 function getStatusClass(status) {
     const statusClasses = {
-        'Reçue': 'status-received',
-        'Assignée': 'status-assigned',
-        'Planifiée': 'status-assigned',
-        'En cours': 'status-in-progress',
-        'Terminée': 'status-completed',
-        'Facturée': 'status-billed',
-        'Payée': 'status-paid',
-        'Maintenance SCH': 'bg-yellow-100 text-yellow-800 border border-yellow-300',
-        'Maintenance VIVEST': 'bg-orange-100 text-orange-800 border border-orange-300',
-        'Maintenance MOSELIS': 'bg-blue-100 text-blue-800 border border-blue-300',
-        'Maintenance CDC': 'bg-green-100 text-green-800 border border-green-300',
-        'Maintenance CDC Habitat': 'bg-green-100 text-green-800 border border-green-300',
-        'CHANTIER': 'bg-purple-100 text-purple-800 border border-purple-300',
-        'Pausée': 'bg-gray-100 text-gray-800',
-        'Annulée': 'bg-red-100 text-red-800'
+        'Reçue': 'bg-blue-100 text-blue-800 border border-blue-300',
+        'Assignée': 'bg-yellow-100 text-yellow-800 border border-yellow-300',
+        'Planifiée': 'bg-green-100 text-green-800 border border-green-300',
+        'En cours': 'bg-purple-100 text-purple-800 border border-purple-300',
+        'Terminée': 'bg-gray-100 text-gray-800 border border-gray-300',
+        'Maintenance SCH': 'bg-orange-100 text-orange-800 border border-orange-300',
+        'Maintenance vivest': 'bg-red-100 text-red-800 border border-red-300',
+        'Maintenance Moselis': 'bg-teal-100 text-teal-800 border border-teal-300',
+        'Maintenance CDC': 'bg-cyan-100 text-cyan-800 border border-cyan-300',
+        'Maintenance CDC Habitat': 'bg-lime-100 text-lime-800 border border-lime-300'
     };
-    return statusClasses[status] || 'bg-gray-100 text-gray-800';
+    return statusClasses[status] || 'bg-cyan-100 text-cyan-800 border border-cyan-300';
+}
+
+function getMissingInfoClass(missingInfo) {
+    switch(missingInfo) {
+        case 'Technicien et Date manquants':
+            return 'bg-red-100 text-red-800 border border-red-300';
+        case 'Technicien manquant':
+            return 'bg-orange-100 text-orange-800 border border-orange-300';
+        case 'Date manquante':
+            return 'bg-yellow-100 text-yellow-800 border border-yellow-300';
+        default:
+            return 'bg-green-100 text-green-800 border border-green-300';
+    }
 }
 
 function getStatusIconHtml(status) {
     const statusIcons = {
-        'Reçue': '<i class="fa fa-clock-o mr-1"></i>',
-        'Assignée': '<i class="fa fa-calendar mr-1"></i>',
-        'Planifiée': '<i class="fa fa-calendar-check-o mr-1"></i>',
-        'En cours': '<i class="fa fa-cog fa-spin mr-1"></i>',
-        'Terminée': '<i class="fa fa-check-circle mr-1"></i>',
-        'Facturée': '<i class="fa fa-euro mr-1"></i>',
-        'Payée': '<i class="fa fa-check-circle-o mr-1"></i>',
-        'Maintenance SCH': '<i class="fa fa-building mr-1" style="color: #eab308;"></i>',
-        'Maintenance VIVEST': '<i class="fa fa-home mr-1" style="color: #f59e0b;"></i>',
-        'Maintenance MOSELIS': '<i class="fa fa-cogs mr-1" style="color: #3b82f6;"></i>',
-        'Maintenance CDC': '<i class="fa fa-wrench mr-1" style="color: #10b981;"></i>',
-        'Maintenance CDC Habitat': '<i class="fa fa-wrench mr-1" style="color: #10b981;"></i>',
-        'CHANTIER': '<i class="fa fa-hard-hat mr-1" style="color: #8b5cf6;"></i>',
-        'Pausée': '<i class="fa fa-pause mr-1"></i>',
-        'Annulée': '<i class="fa fa-times-circle mr-1"></i>'
+        'Reçue': '📨',
+        'Assignée': '👤',
+        'Planifiée': '📅',
+        'En cours': '⚡',
+        'Terminée': '✅',
+        'Maintenance SCH': '🔧',
+        'Maintenance VIVEST': '🔧',
+        'Maintenance Moselis': '🔧',
+        'Maintenance CDC': '🔧',
+        'Maintenance CDC Habitat': '🔧'
     };
-    return statusIcons[status] || '<i class="fa fa-question mr-1"></i>';
+    return statusIcons[status] || '📋';
+}
+
+function getMissingIcon(missingInfo) {
+    switch(missingInfo) {
+        case 'Technicien et Date manquants':
+            return '🚨';
+        case 'Technicien manquant':
+            return '👤❌';
+        case 'Date manquante':
+            return '📅❌';
+        default:
+            return '✅';
+    }
+}
+
+function getTimeIcon(hours) {
+    if (hours <= 0) return '⏰💥';
+    if (hours <= 6) return '🚨';
+    if (hours <= 12) return '⚠️';
+    if (hours <= 24) return '⚡';
+    return '✅';
+}
+
+function formatTimeRemaining(hours) {
+    if (hours <= 0) return 'EXPIRÉ';
+    if (hours < 1) return `${Math.round(hours * 60)}min`;
+    return `${Math.round(hours)}h`;
 }

@@ -1,4 +1,4 @@
-// views/urgentInterventions.js - SIMPLIFIED to avoid 500 errors
+// views/urgentInterventions.js - Complete urgent interventions page
 
 function getUrgentInterventionsHTML() {
     return `<!DOCTYPE html>
@@ -21,7 +21,7 @@ function getUrgentInterventionsHTML() {
                             <span class="text-white font-bold text-lg">TI</span>
                         </div>
                         <div>
-                            <h1 class="text-xl font-bold text-gray-900">Interventions Techniques</h1>
+                            <h1 class="text-xl font-bold text-gray-900">ASTRO TECH</h1>
                             <p class="text-sm text-gray-500">Interventions urgentes - 48h pile</p>
                         </div>
                     </a>
@@ -41,163 +41,143 @@ function getUrgentInterventionsHTML() {
                 <span class="w-4 h-4 bg-red-500 rounded-full mr-3 animate-pulse"></span>
                 Interventions Urgentes - 48h Pile
             </h1>
-            <p class="text-gray-600 mt-2">Interventions créées dans les 48h nécessitant une assignation</p>
+            <p class="text-gray-600 mt-2">Interventions manquant technicien ou date de planification</p>
         </div>
 
-        <!-- Simple Filters -->
+        <!-- Stats Card -->
         <div class="bg-white rounded-lg shadow mb-6 p-6">
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div class="flex items-center justify-between">
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-2">Recherche</label>
-                    <input 
-                        type="text" 
-                        id="search-input"
-                        placeholder="N°, titre, adresse..." 
-                        class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    >
+                    <h3 class="text-lg font-semibold text-gray-900">Statistiques</h3>
+                    <p id="total-count" class="text-2xl font-bold text-red-600">Chargement...</p>
                 </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-2">Statut</label>
-                    <select id="status-filter" class="w-full px-3 py-2 border border-gray-300 rounded-md">
-                        <option value="">Tous les statuts</option>
-                        <option value="planifie">Planifiée</option>
-                        <option value="maintenance">Maintenance</option>
-                    </select>
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-2">Actions</label>
-                    <button onclick="loadData()" class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700">
+                <div class="text-right">
+                    <button onclick="refreshData()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm">
                         <i class="fa fa-refresh mr-2"></i>Actualiser
                     </button>
                 </div>
             </div>
         </div>
 
-        <!-- Results Table -->
+        <!-- Filters -->
+        <div class="bg-white rounded-lg shadow mb-6 p-6">
+            <h3 class="text-lg font-semibold text-gray-900 mb-4">Filtres</h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+                <div>
+                    <label for="search-input" class="block text-sm font-medium text-gray-700 mb-1">Recherche</label>
+                    <input type="text" id="search-input" 
+                           placeholder="N°, titre, adresse..." 
+                           class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+                <div>
+                    <label for="status-filter" class="block text-sm font-medium text-gray-700 mb-1">Statut</label>
+                    <select id="status-filter" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <option value="">Tous les statuts</option>
+                        <option value="recu">Reçue</option>
+                        <option value="assigne">Assignée</option>
+                        <option value="planifie">Planifiée</option>
+                        <option value="maintenance">Maintenance</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="missing-filter" class="block text-sm font-medium text-gray-700 mb-1">Info manquante</label>
+                    <select id="missing-filter" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <option value="">Toutes</option>
+                        <option value="technician">Technicien manquant</option>
+                        <option value="date">Date manquante</option>
+                        <option value="both">Technicien et date</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="time-filter" class="block text-sm font-medium text-gray-700 mb-1">Temps restant</label>
+                    <select id="time-filter" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <option value="">Toutes</option>
+                        <option value="expired">⏰ Expiré (0h)</option>
+                        <option value="critical">🚨 Critique (≤6h)</option>
+                        <option value="urgent">⚠️ Urgent (6-12h)</option>
+                        <option value="warning">⚡ Attention (12-24h)</option>
+                        <option value="good">✅ Correct (24-48h)</option>
+                    </select>
+                </div>
+                <div class="flex items-end">
+                    <button onclick="clearFilters()" class="w-full bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-md text-sm">
+                        Effacer filtres
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Results table -->
         <div class="bg-white rounded-lg shadow overflow-hidden">
+            <div class="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+                <div class="flex items-center space-x-4">
+                    <span class="text-sm text-gray-700">
+                        Affichage de <span id="showing-start">1</span> à <span id="showing-end">25</span> sur <span id="total-results">25</span> résultats
+                    </span>
+                </div>
+                <div class="flex items-center space-x-2">
+                    <label for="page-size" class="text-sm text-gray-700">Afficher:</label>
+                    <select id="page-size" class="px-2 py-1 border border-gray-300 rounded text-sm">
+                        <option value="25">25</option>
+                        <option value="50">50</option>
+                        <option value="100">100</option>
+                    </select>
+                    <span class="text-sm text-gray-700">par page</span>
+                </div>
+            </div>
+
             <div class="overflow-x-auto">
                 <table class="min-w-full divide-y divide-gray-200">
                     <thead class="bg-gradient-to-r from-red-50 to-gray-50">
                         <tr>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">N° Intervention</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Titre</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Statut</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Manquant</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Temps Restant</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Assigné à</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100" onclick="sortBy('intervention_id')">
+                                N° Intervention <i class="fa fa-sort ml-1"></i>
+                            </th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100" onclick="sortBy('title')">
+                                Titre <i class="fa fa-sort ml-1"></i>
+                            </th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Adresse
+                            </th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100" onclick="sortBy('status')">
+                                Statut <i class="fa fa-sort ml-1"></i>
+                            </th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                ❌ Manquant
+                            </th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100" onclick="sortBy('hours_remaining')">
+                                ⏰ Temps Restant <i class="fa fa-sort ml-1"></i>
+                            </th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Assigné à
+                            </th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Actions
+                            </th>
                         </tr>
                     </thead>
                     <tbody id="urgent-table" class="bg-white divide-y divide-gray-200">
                         <tr>
-                            <td colspan="6" class="px-6 py-4 text-center text-gray-500">Chargement...</td>
+                            <td colspan="8" class="px-6 py-8 text-center text-gray-500">
+                                <i class="fa fa-spinner fa-spin mr-2"></i>Chargement des interventions urgentes...
+                            </td>
                         </tr>
                     </tbody>
                 </table>
             </div>
-        </div>
 
-        <!-- Simple Pagination -->
-        <div class="mt-6 flex items-center justify-between">
-            <div class="text-sm text-gray-700">
-                <span id="total-count">Chargement...</span>
-            </div>
-            <div class="flex items-center space-x-2">
-                <button onclick="previousPage()" class="px-3 py-2 text-sm bg-white border border-gray-300 rounded-md hover:bg-gray-50">Précédent</button>
-                <span id="page-info" class="px-3 py-2 text-sm">Page 1</span>
-                <button onclick="nextPage()" class="px-3 py-2 text-sm bg-white border border-gray-300 rounded-md hover:bg-gray-50">Suivant</button>
+            <!-- Pagination -->
+            <div class="bg-gray-50 px-6 py-3 border-t border-gray-200">
+                <div class="flex items-center justify-center">
+                    <nav class="flex" id="pagination-controls">
+                        <!-- Pagination buttons will be inserted here by JavaScript -->
+                    </nav>
+                </div>
             </div>
         </div>
     </main>
 
-    <script>
-        let currentPage = 1;
-        let currentData = [];
-
-        document.addEventListener('DOMContentLoaded', function() {
-            loadData();
-        });
-
-        function loadData() {
-            console.log('Loading urgent interventions...');
-            
-            fetch('/nodetest/api/urgent-all?page=' + currentPage + '&limit=25')
-                .then(response => {
-                    if (!response.ok) {
-                        throw new Error('HTTP ' + response.status);
-                    }
-                    return response.json();
-                })
-                .then(result => {
-                    console.log('Data loaded:', result);
-                    displayData(result.data || []);
-                    updateStats(result.pagination || {});
-                })
-                .catch(error => {
-                    console.error('Error loading data:', error);
-                    document.getElementById('urgent-table').innerHTML = 
-                        '<tr><td colspan="6" class="px-6 py-4 text-center text-red-500">Erreur: ' + error.message + '</td></tr>';
-                });
-        }
-
-        function displayData(data) {
-            const tbody = document.getElementById('urgent-table');
-            
-            if (data.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="6" class="px-6 py-4 text-center text-gray-500">Aucune intervention trouvée</td></tr>';
-                return;
-            }
-
-            tbody.innerHTML = data.map(item => {
-                const hoursRemaining = parseInt(item.hours_remaining) || 0;
-                let timeDisplay = hoursRemaining + 'h';
-                let rowClass = '';
-                
-                if (hoursRemaining <= 6) {
-                    timeDisplay = '🔥 ' + timeDisplay;
-                    rowClass = 'bg-red-50';
-                } else if (hoursRemaining <= 12) {
-                    timeDisplay = '⚡ ' + timeDisplay;
-                    rowClass = 'bg-orange-50';
-                } else if (hoursRemaining <= 24) {
-                    timeDisplay = '⏳ ' + timeDisplay;
-                    rowClass = 'bg-yellow-50';
-                } else {
-                    timeDisplay = '✅ ' + timeDisplay;
-                    rowClass = 'bg-green-50';
-                }
-
-                return \`
-                    <tr class="hover:bg-gray-50 \${rowClass}">
-                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-blue-600">\${item.intervention_id || '-'}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">\${item.title || '-'}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">\${item.status || '-'}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">\${item.missing_info || '-'}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">\${timeDisplay}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">\${item.assigned_to || 'Non assigné'}</td>
-                    </tr>
-                \`;
-            }).join('');
-        }
-
-        function updateStats(pagination) {
-            document.getElementById('total-count').textContent = 
-                (pagination.totalCount || 0) + ' intervention(s) urgente(s)';
-            document.getElementById('page-info').textContent = 
-                'Page ' + (pagination.currentPage || 1) + ' sur ' + (pagination.totalPages || 1);
-        }
-
-        function previousPage() {
-            if (currentPage > 1) {
-                currentPage--;
-                loadData();
-            }
-        }
-
-        function nextPage() {
-            currentPage++;
-            loadData();
-        }
-    </script>
+    <script src="/nodetest/js/urgent.js"></script>
 </body>
 </html>`;
 }
