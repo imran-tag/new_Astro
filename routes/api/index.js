@@ -1,4 +1,4 @@
-// routes/api/index.js - API route organization with Action Endpoints
+// routes/api/index.js - Updated with debug endpoint
 const express = require('express');
 const router = express.Router();
 
@@ -32,6 +32,15 @@ router.post('/generate-rapport', interventionsController.generateRapport);
 router.post('/generate-quitus', interventionsController.generateQuitus);
 router.delete('/delete-intervention', interventionsController.deleteIntervention);
 router.get('/public-intervention/:interventionId', interventionsController.getPublicIntervention);
+
+// NEW: Debug endpoint for image paths
+router.get('/debug-images/:interventionId', interventionsController.debugImagePaths);
+
+// NEW: Test endpoint for public intervention debugging
+router.get('/test-public/:interventionId', interventionsController.testPublicIntervention);
+
+// NEW: Debug endpoint for dropdown data
+router.get('/debug-dropdowns', interventionsController.debugDropdownData);
 
 // Create intervention endpoints (with error handling)
 try {

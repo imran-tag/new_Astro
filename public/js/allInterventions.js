@@ -653,14 +653,18 @@ function downloadRapport() {
     .then(response => response.json())
     .then(data => {
         hideLoading();
-        if (data.success && data.url) {
+        
+        // Handle response like old_Astro format
+        if ((data.success && data.url) || (data.code === '1' && data.url)) {
             // Create temporary download link
             const link = document.createElement('a');
             link.href = data.url;
-            link.download = data.filename || `rapport_${interventionId}.pdf`;
+            link.download = data.name || data.filename || `rapport_${interventionId}.pdf`;
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
+            
+            showSuccess('Rapport généré et téléchargé avec succès');
         } else {
             showError('Erreur lors de la génération du rapport');
         }
@@ -671,6 +675,7 @@ function downloadRapport() {
         showError('Erreur lors de la génération du rapport');
     });
 }
+
 
 function downloadQuitus() {
     const interventionId = document.getElementById('download-intervention-id').value;
@@ -694,14 +699,18 @@ function downloadQuitus() {
     .then(response => response.json())
     .then(data => {
         hideLoading();
-        if (data.success && data.url) {
+        
+        // Handle response like old_Astro format
+        if ((data.success && data.url) || (data.code === '1' && data.url)) {
             // Create temporary download link
             const link = document.createElement('a');
             link.href = data.url;
-            link.download = data.filename || `quitus_${interventionId}.pdf`;
+            link.download = data.name || data.filename || `quitus_${interventionId}.pdf`;
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
+            
+            showSuccess('Quitus généré et téléchargé avec succès');
         } else {
             showError('Erreur lors de la génération du quitus');
         }
@@ -717,6 +726,70 @@ function openPublicLink(interventionId) {
     // Open public intervention page in new tab using intervention ID
     const url = `/nodetest/interventions/public/${interventionId}`;
     window.open(url, '_blank');
+}
+
+function showSuccess(message) {
+    // Create or update success notification
+    const notification = document.createElement('div');
+    notification.className = 'fixed top-4 right-4 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg z-50';
+    notification.innerHTML = `
+        <div class="flex items-center">
+            <i class="fa fa-check-circle mr-2"></i>
+            <span>${message}</span>
+        </div>
+    `;
+    
+    document.body.appendChild(notification);
+    
+    // Auto remove after 3 seconds
+    setTimeout(() => {
+        if (notification.parentNode) {
+            notification.parentNode.removeChild(notification);
+        }
+    }, 3000);
+}
+
+function showError(message) {
+    // Create or update error notification
+    const notification = document.createElement('div');
+    notification.className = 'fixed top-4 right-4 bg-red-500 text-white px-6 py-3 rounded-lg shadow-lg z-50';
+    notification.innerHTML = `
+        <div class="flex items-center">
+            <i class="fa fa-exclamation-circle mr-2"></i>
+            <span>${message}</span>
+        </div>
+    `;
+    
+    document.body.appendChild(notification);
+    
+    // Auto remove after 5 seconds
+    setTimeout(() => {
+        if (notification.parentNode) {
+            notification.parentNode.removeChild(notification);
+        }
+    }, 5000);
+}
+
+function showLoading(message = 'Chargement...') {
+    // Create loading overlay
+    const overlay = document.createElement('div');
+    overlay.id = 'loading-overlay';
+    overlay.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+    overlay.innerHTML = `
+        <div class="bg-white rounded-lg p-6 flex items-center space-x-3">
+            <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+            <span class="text-gray-700 font-medium">${message}</span>
+        </div>
+    `;
+    
+    document.body.appendChild(overlay);
+}
+
+function hideLoading() {
+    const overlay = document.getElementById('loading-overlay');
+    if (overlay && overlay.parentNode) {
+        overlay.parentNode.removeChild(overlay);
+    }
 }
 
 function deleteIntervention(interventionId) {
