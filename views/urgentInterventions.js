@@ -1,4 +1,4 @@
-// views/urgentInterventions.js - Complete urgent interventions page with action modals
+// views/urgentInterventions.js - Complete urgent interventions page with action modals and description column
 
 function getUrgentInterventionsHTML() {
     return `<!DOCTYPE html>
@@ -16,6 +16,17 @@ function getUrgentInterventionsHTML() {
         }
         .modal {
             backdrop-filter: blur(4px);
+        }
+        .description-column {
+            max-width: 150px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            cursor: help;
+        }
+        
+        .description-cell:hover {
+            background-color: #f3f4f6;
         }
     </style>
 </head>
@@ -49,88 +60,97 @@ function getUrgentInterventionsHTML() {
                 <span class="w-4 h-4 bg-red-500 rounded-full mr-3 animate-pulse"></span>
                 Interventions Urgentes - 48h Pile
             </h1>
-            <p class="text-gray-600 mt-2">Interventions manquant technicien ou date de planification</p>
+            <p class="text-gray-600 mt-2">
+                <i class="fa fa-info-circle mr-2"></i>Interventions nécessitant une attention immédiate - Délai de 48h ouvrées
+            </p>
         </div>
 
-        <!-- Stats Card -->
-        <div class="bg-white rounded-lg shadow mb-6 p-6">
-            <div class="flex items-center justify-between">
-                <div>
-                    <h3 class="text-lg font-semibold text-gray-900">Statistiques</h3>
-                    <p id="total-count" class="text-2xl font-bold text-red-600">Chargement...</p>
-                </div>
-                <div class="text-right">
-                    <button onclick="refreshData()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm">
-                        <i class="fa fa-refresh mr-2"></i>Actualiser
+        <!-- Stats Summary -->
+        <div class="mb-6">
+            <div class="bg-white rounded-lg shadow-sm border border-gray-200 px-6 py-4">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center">
+                        <div class="w-3 h-3 bg-red-500 rounded-full mr-3 animate-pulse"></div>
+                        <span id="total-count" class="text-lg font-semibold text-gray-900">Chargement...</span>
+                    </div>
+                    <button onclick="refreshData()" class="text-blue-600 hover:text-blue-800 text-sm font-medium">
+                        <i class="fa fa-refresh mr-1"></i>Actualiser
                     </button>
                 </div>
             </div>
         </div>
 
         <!-- Filters -->
-        <div class="bg-white rounded-lg shadow mb-6 p-6">
-            <h3 class="text-lg font-semibold text-gray-900 mb-4">Filtres</h3>
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-                <div>
-                    <label for="search-input" class="block text-sm font-medium text-gray-700 mb-1">Recherche</label>
-                    <input type="text" id="search-input" 
-                           placeholder="N°, titre, adresse..." 
-                           class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
-                </div>
-                <div>
-                    <label for="status-filter" class="block text-sm font-medium text-gray-700 mb-1">Statut</label>
-                    <select id="status-filter" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
-                        <option value="">Tous les statuts</option>
-                        <option value="recu">Reçue</option>
-                        <option value="assigne">Assignée</option>
-                        <option value="planifie">Planifiée</option>
-                        <option value="maintenance">Maintenance</option>
-                    </select>
-                </div>
-                <div>
-                    <label for="missing-filter" class="block text-sm font-medium text-gray-700 mb-1">Info manquante</label>
-                    <select id="missing-filter" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
-                        <option value="">Toutes</option>
-                        <option value="technician">Technicien manquant</option>
-                        <option value="date">Date manquante</option>
-                        <option value="both">Technicien et date</option>
-                    </select>
-                </div>
-                <div>
-                    <label for="time-filter" class="block text-sm font-medium text-gray-700 mb-1">Temps restant</label>
-                    <select id="time-filter" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
-                        <option value="">Toutes</option>
-                        <option value="expired">⏰ Expiré (0h)</option>
-                        <option value="critical">🚨 Critique (≤6h)</option>
-                        <option value="urgent">⚠️ Urgent (6-12h)</option>
-                        <option value="warning">⚡ Attention (12-24h)</option>
-                        <option value="good">✅ Correct (24-48h)</option>
-                    </select>
-                </div>
-                <div class="flex items-end">
-                    <button onclick="clearFilters()" class="w-full bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-md text-sm">
-                        Effacer filtres
-                    </button>
+        <div class="mb-6">
+            <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                <h3 class="text-lg font-medium text-gray-900 mb-4">Filtres</h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+                    <div>
+                        <label for="search-input" class="block text-sm font-medium text-gray-700 mb-1">Rechercher</label>
+                        <input type="text" id="search-input" placeholder="N°, titre, adresse..." 
+                               class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                    </div>
+                    <div>
+                        <label for="status-filter" class="block text-sm font-medium text-gray-700 mb-1">Statut</label>
+                        <select id="status-filter" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                            <option value="">Tous les statuts</option>
+                            <option value="received">Reçu</option>
+                            <option value="assigned">Assigné</option>
+                            <option value="in-progress">En cours</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="missing-filter" class="block text-sm font-medium text-gray-700 mb-1">Manquant</label>
+                        <select id="missing-filter" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                            <option value="">Tout</option>
+                            <option value="technician">Technicien manquant</option>
+                            <option value="date">Date manquante</option>
+                            <option value="both">Technicien et Date</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="time-filter" class="block text-sm font-medium text-gray-700 mb-1">Temps restant</label>
+                        <select id="time-filter" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                            <option value="">Tous</option>
+                            <option value="expired">Expiré (0h)</option>
+                            <option value="critical">Critique (≤6h)</option>
+                            <option value="urgent">Urgent (≤12h)</option>
+                            <option value="warning">Attention (≤24h)</option>
+                            <option value="good">Correct (≤48h)</option>
+                        </select>
+                    </div>
+                    <div class="flex items-end">
+                        <button onclick="clearFilters()" class="w-full px-4 py-2 text-sm text-gray-600 bg-gray-100 border border-gray-300 rounded-md hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-500">
+                            <i class="fa fa-times mr-1"></i>Effacer
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
 
-        <!-- Results table -->
-        <div class="bg-white rounded-lg shadow overflow-hidden">
-            <div class="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
-                <div class="flex items-center space-x-4">
-                    <span class="text-sm text-gray-700">
-                        Affichage de <span id="showing-start">1</span> à <span id="showing-end">25</span> sur <span id="total-results">25</span> résultats
-                    </span>
-                </div>
-                <div class="flex items-center space-x-2">
-                    <label for="page-size" class="text-sm text-gray-700">Afficher:</label>
-                    <select id="page-size" class="px-2 py-1 border border-gray-300 rounded text-sm">
-                        <option value="25">25</option>
-                        <option value="50">50</option>
-                        <option value="100">100</option>
-                    </select>
-                    <span class="text-sm text-gray-700">par page</span>
+        <!-- Main Table -->
+        <div class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+            <!-- Table Controls -->
+            <div class="bg-gray-50 px-6 py-4 border-b border-gray-200">
+                <div class="flex justify-between items-center">
+                    <div class="flex items-center text-sm text-gray-700">
+                        <span>Affichage </span>
+                        <span id="showing-start" class="font-medium">0</span>
+                        <span> à </span>
+                        <span id="showing-end" class="font-medium">0</span>
+                        <span> sur </span>
+                        <span id="total-results" class="font-medium">0</span>
+                        <span> résultats</span>
+                    </div>
+                    <div class="flex items-center">
+                        <select id="results-per-page" onchange="changeResultsPerPage()" class="px-3 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <option value="10">10</option>
+                            <option value="25" selected>25</option>
+                            <option value="50">50</option>
+                            <option value="100">100</option>
+                        </select>
+                        <span class="ml-2 text-sm text-gray-700">par page</span>
+                    </div>
                 </div>
             </div>
 
@@ -143,6 +163,9 @@ function getUrgentInterventionsHTML() {
                             </th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100" onclick="sortBy('title')">
                                 Titre <i class="fa fa-sort ml-1"></i>
+                            </th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Description
                             </th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                 Adresse
@@ -165,8 +188,9 @@ function getUrgentInterventionsHTML() {
                         </tr>
                     </thead>
                     <tbody id="urgent-table" class="bg-white divide-y divide-gray-200">
+                        <!-- Table content will be populated by JavaScript -->
                         <tr>
-                            <td colspan="8" class="px-6 py-8 text-center text-gray-500">
+                            <td colspan="9" class="px-6 py-8 text-center text-gray-500">
                                 <i class="fa fa-spinner fa-spin mr-2"></i>Chargement des interventions urgentes...
                             </td>
                         </tr>
@@ -175,76 +199,96 @@ function getUrgentInterventionsHTML() {
             </div>
 
             <!-- Pagination -->
-            <div class="bg-gray-50 px-6 py-3 border-t border-gray-200">
-                <div class="flex items-center justify-center">
-                    <nav class="flex" id="pagination-controls">
-                        <!-- Pagination buttons will be inserted here by JavaScript -->
-                    </nav>
+            <div class="bg-gray-50 px-6 py-4 border-t border-gray-200">
+                <div class="flex justify-center">
+                    <div id="pagination-controls" class="flex space-x-1">
+                        <!-- Pagination will be populated by JavaScript -->
+                    </div>
                 </div>
             </div>
         </div>
     </main>
 
     <!-- Technician Assignment Modal -->
-    <div id="technician-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 modal hidden z-50">
-        <div class="flex items-center justify-center min-h-screen p-4">
-            <div class="bg-white rounded-lg shadow-xl max-w-md w-full">
-                <div class="px-6 py-4 border-b border-gray-200">
-                    <h3 id="technician-modal-title" class="text-lg font-semibold text-gray-900">Assigner un technicien</h3>
-                </div>
-                <div class="px-6 py-4">
-                    <input type="hidden" id="modal-intervention-id">
-                    <div class="mb-4">
-                        <label for="technician-select" class="block text-sm font-medium text-gray-700 mb-2">
-                            Sélectionner un technicien
-                        </label>
-                        <select id="technician-select" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
-                            <option value="">Chargement des techniciens...</option>
-                        </select>
+    <div id="technician-modal" class="hidden fixed inset-0 z-50 overflow-y-auto">
+        <div class="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+            <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity modal" onclick="closeModal('technician-modal')"></div>
+            
+            <div class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+                <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                    <div class="sm:flex sm:items-start">
+                        <div class="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-blue-100 sm:mx-0 sm:h-10 sm:w-10">
+                            <i class="fa fa-user-plus text-blue-600"></i>
+                        </div>
+                        <div class="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left flex-1">
+                            <h3 id="technician-modal-title" class="text-lg leading-6 font-medium text-gray-900">
+                                Assigner un technicien
+                            </h3>
+                            <div class="mt-4">
+                                <label for="technician-select" class="block text-sm font-medium text-gray-700 mb-2">
+                                    Sélectionner un technicien
+                                </label>
+                                <select id="technician-select" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                    <option value="">Chargement...</option>
+                                </select>
+                            </div>
+                        </div>
                     </div>
                 </div>
-                <div class="px-6 py-4 border-t border-gray-200 flex justify-end space-x-3">
-                    <button onclick="closeModal('technician-modal')" class="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50">
-                        Annuler
-                    </button>
-                    <button onclick="saveTechnicianAssignment()" class="px-4 py-2 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700">
+                <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                    <button onclick="confirmTechnicianAssignment()" class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:ml-3 sm:w-auto sm:text-sm">
                         Assigner
                     </button>
+                    <button onclick="closeModal('technician-modal')" class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm">
+                        Annuler
+                    </button>
                 </div>
+                <input type="hidden" id="modal-intervention-id" value="">
             </div>
         </div>
     </div>
 
     <!-- Date Assignment Modal -->
-    <div id="date-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 modal hidden z-50">
-        <div class="flex items-center justify-center min-h-screen p-4">
-            <div class="bg-white rounded-lg shadow-xl max-w-md w-full">
-                <div class="px-6 py-4 border-b border-gray-200">
-                    <h3 id="date-modal-title" class="text-lg font-semibold text-gray-900">Définir une date</h3>
-                </div>
-                <div class="px-6 py-4">
-                    <input type="hidden" id="date-modal-intervention-id">
-                    <div class="mb-4">
-                        <label for="intervention-date" class="block text-sm font-medium text-gray-700 mb-2">
-                            Date d'intervention <span class="text-red-500">*</span>
-                        </label>
-                        <input type="date" id="intervention-date" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+    <div id="date-modal" class="hidden fixed inset-0 z-50 overflow-y-auto">
+        <div class="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+            <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity modal" onclick="closeModal('date-modal')"></div>
+            
+            <div class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+                <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                    <div class="sm:flex sm:items-start">
+                        <div class="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-green-100 sm:mx-0 sm:h-10 sm:w-10">
+                            <i class="fa fa-calendar-plus text-green-600"></i>
+                        </div>
+                        <div class="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left flex-1">
+                            <h3 id="date-modal-title" class="text-lg leading-6 font-medium text-gray-900">
+                                Définir une date d'intervention
+                            </h3>
+                            <div class="mt-4 space-y-4">
+                                <div>
+                                    <label for="intervention-date" class="block text-sm font-medium text-gray-700 mb-2">
+                                        Date <span class="text-red-500">*</span>
+                                    </label>
+                                    <input type="date" id="intervention-date" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500">
+                                </div>
+                                <div>
+                                    <label for="intervention-time" class="block text-sm font-medium text-gray-700 mb-2">
+                                        Heure (optionnel)
+                                    </label>
+                                    <input type="time" id="intervention-time" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500">
+                                </div>
+                            </div>
+                        </div>
                     </div>
-                    <div class="mb-4">
-                        <label for="intervention-time" class="block text-sm font-medium text-gray-700 mb-2">
-                            Heure d'intervention (optionnel)
-                        </label>
-                        <input type="time" id="intervention-time" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
-                    </div>
                 </div>
-                <div class="px-6 py-4 border-t border-gray-200 flex justify-end space-x-3">
-                    <button onclick="closeModal('date-modal')" class="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50">
+                <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                    <button onclick="confirmDateAssignment()" class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-green-600 text-base font-medium text-white hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 sm:ml-3 sm:w-auto sm:text-sm">
+                        Définir
+                    </button>
+                    <button onclick="closeModal('date-modal')" class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm">
                         Annuler
                     </button>
-                    <button onclick="saveDateAssignment()" class="px-4 py-2 bg-green-600 text-white rounded-md text-sm font-medium hover:bg-green-700">
-                        Définir la date
-                    </button>
                 </div>
+                <input type="hidden" id="date-modal-intervention-id" value="">
             </div>
         </div>
     </div>

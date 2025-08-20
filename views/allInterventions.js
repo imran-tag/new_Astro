@@ -1,4 +1,4 @@
-// views/allInterventions.js - All interventions listing page
+// views/allInterventions.js - All interventions listing page with Actions
 function getAllInterventionsHTML() {
     return `
 <!DOCTYPE html>
@@ -41,6 +41,10 @@ function getAllInterventionsHTML() {
             padding: 2px 4px;
             margin: -2px -4px;
         }
+        
+        .modal {
+            backdrop-filter: blur(4px);
+        }
     </style>
 </head>
 <body class="bg-gray-50">
@@ -59,24 +63,47 @@ function getAllInterventionsHTML() {
                     </h1>
                 </div>
                 <div class="flex items-center space-x-4">
-                    <span id="stats-display" class="text-sm text-gray-500">Chargement...</span>
-                    <button onclick="refreshData()" class="p-2 text-gray-400 hover:text-gray-600 transition-colors">
-                        <i class="fas fa-sync-alt"></i>
-                    </button>
+                    <a href="/nodetest/create-intervention" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm transition-colors">
+                        <i class="fas fa-plus mr-2"></i>
+                        Nouvelle Intervention
+                    </a>
                 </div>
             </div>
         </div>
     </header>
 
-    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <!-- Filters Section -->
-        <div class="bg-white rounded-lg shadow border border-gray-200 mb-6">
-            <div class="p-6">
+    <main class="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
+        <!-- Page Description -->
+        <div class="mb-8">
+            <p class="text-gray-600">
+                <i class="fas fa-info-circle mr-2"></i>
+                Consultez et gérez toutes vos interventions avec des filtres avancés et des outils de recherche.
+            </p>
+        </div>
+
+        <!-- Stats Summary -->
+        <div class="mb-6">
+            <div class="bg-white rounded-lg shadow-sm border border-gray-200 px-6 py-4">
+                <div class="flex items-center justify-between">
+                    <span id="total-count" class="text-lg font-semibold text-gray-900">Chargement...</span>
+                    <button onclick="loadInterventions()" class="text-blue-600 hover:text-blue-800 text-sm font-medium">
+                        <i class="fa fa-refresh mr-1"></i>Actualiser
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Filters -->
+        <div class="mb-6">
+            <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                <h3 class="text-lg font-medium text-gray-900 mb-4">Filtres et Recherche</h3>
+                
+                <!-- First row for basic filters -->
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
                     <!-- Search -->
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">Recherche</label>
-                        <input type="text" id="search-input" placeholder="N°, titre, adresse..." 
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Rechercher</label>
+                        <input type="text" id="search-input" placeholder="N°, titre, description..." 
                                class="filter-input w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
                     </div>
                     
@@ -85,12 +112,12 @@ function getAllInterventionsHTML() {
                         <label class="block text-sm font-medium text-gray-700 mb-2">Statut</label>
                         <select id="status-filter" class="filter-input w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
                             <option value="">Tous les statuts</option>
-                            <option value="received">Reçues</option>
-                            <option value="assigned">Assignées</option>
+                            <option value="received">Reçu</option>
+                            <option value="assigned">Assigné</option>
                             <option value="in-progress">En cours</option>
-                            <option value="completed">Terminées</option>
-                            <option value="billed">Facturées</option>
-                            <option value="paid">Payées</option>
+                            <option value="completed">Terminé</option>
+                            <option value="billed">Facturé</option>
+                            <option value="paid">Payé</option>
                         </select>
                     </div>
                     
@@ -160,16 +187,14 @@ function getAllInterventionsHTML() {
                     <!-- Sort Options -->
                     <div class="flex items-center space-x-2">
                         <label class="text-sm font-medium text-gray-700">Trier par:</label>
-                        <select id="sort-by" class="px-3 py-1 border border-gray-300 rounded-md text-sm">
+                        <select id="sort-by" class="px-3 py-1 border border-gray-300 rounded text-sm">
                             <option value="created_at">Date de création</option>
-                            <option value="date_time">Date intervention</option>
-                            <option value="intervention_id">N° Intervention</option>
+                            <option value="date_time">Date d'intervention</option>
                             <option value="title">Titre</option>
                             <option value="status">Statut</option>
                             <option value="priority">Priorité</option>
-                            <option value="assigned_to">Technicien</option>
                         </select>
-                        <select id="sort-order" class="px-3 py-1 border border-gray-300 rounded-md text-sm">
+                        <select id="sort-order" class="px-3 py-1 border border-gray-300 rounded text-sm">
                             <option value="desc">Décroissant</option>
                             <option value="asc">Croissant</option>
                         </select>
@@ -178,42 +203,26 @@ function getAllInterventionsHTML() {
             </div>
         </div>
 
-        <!-- Results Table -->
-        <div class="bg-white rounded-lg shadow border border-gray-200">
-            <div class="px-6 py-4 border-b border-gray-200">
-                <div class="flex justify-between items-center">
-                    <h2 class="text-lg font-semibold text-gray-900">Résultats</h2>
-                    <div class="flex items-center space-x-4">
-                        <span id="results-count" class="text-sm text-gray-500">-</span>
-                        <div class="flex items-center space-x-2">
-                            <label class="text-sm text-gray-700">Afficher:</label>
-                            <select id="page-size" onchange="changePageSize()" class="px-2 py-1 border border-gray-300 rounded text-sm">
-                                <option value="25">25</option>
-                                <option value="50">50</option>
-                                <option value="100">100</option>
-                            </select>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            
+        <!-- Main Table -->
+        <div class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
             <div class="overflow-x-auto">
                 <table class="min-w-full divide-y divide-gray-200">
                     <thead class="bg-gradient-to-r from-gray-50 to-blue-50">
                         <tr>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">N° Intervention</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Titre</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Adresse</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Description</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Adresse</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Statut</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Priorité</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date Intervention</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Assigné à</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                         </tr>
                     </thead>
                     <tbody id="interventions-table" class="bg-white divide-y divide-gray-200">
                         <tr>
-                            <td colspan="8" class="px-6 py-8 text-center text-gray-500">
+                            <td colspan="9" class="px-6 py-8 text-center text-gray-500">
                                 <i class="fas fa-spinner fa-spin mr-2"></i>Chargement des interventions...
                             </td>
                         </tr>
@@ -227,6 +236,81 @@ function getAllInterventionsHTML() {
             </div>
         </div>
     </main>
+
+    <!-- Download Choice Modal -->
+    <div id="download-modal" class="hidden fixed inset-0 z-50 overflow-y-auto">
+        <div class="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+            <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity modal" onclick="closeModal('download-modal')"></div>
+            
+            <div class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+                <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                    <div class="sm:flex sm:items-start">
+                        <div class="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-green-100 sm:mx-0 sm:h-10 sm:w-10">
+                            <i class="fa fa-download text-green-600"></i>
+                        </div>
+                        <div class="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left flex-1">
+                            <h3 class="text-lg leading-6 font-medium text-gray-900">
+                                Télécharger le document
+                            </h3>
+                            <div class="mt-2">
+                                <p class="text-sm text-gray-500">
+                                    Voulez-vous télécharger le rapport ou le quitus ?
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                    <button onclick="downloadQuitus()" class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-purple-600 text-base font-medium text-white hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 sm:ml-3 sm:w-auto sm:text-sm">
+                        <i class="fa fa-file-text mr-2"></i>Quitus
+                    </button>
+                    <button onclick="downloadRapport()" class="mt-3 w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-green-600 text-base font-medium text-white hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm">
+                        <i class="fa fa-file mr-2"></i>Rapport
+                    </button>
+                    <button onclick="closeModal('download-modal')" class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm">
+                        Annuler
+                    </button>
+                </div>
+                <input type="hidden" id="download-intervention-id" value="">
+            </div>
+        </div>
+    </div>
+
+    <!-- Delete Confirmation Modal -->
+    <div id="delete-modal" class="hidden fixed inset-0 z-50 overflow-y-auto">
+        <div class="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+            <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity modal" onclick="closeModal('delete-modal')"></div>
+            
+            <div class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+                <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                    <div class="sm:flex sm:items-start">
+                        <div class="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-red-100 sm:mx-0 sm:h-10 sm:w-10">
+                            <i class="fa fa-exclamation-triangle text-red-600"></i>
+                        </div>
+                        <div class="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left">
+                            <h3 class="text-lg leading-6 font-medium text-gray-900">
+                                Supprimer l'intervention
+                            </h3>
+                            <div class="mt-2">
+                                <p class="text-sm text-gray-500">
+                                    Voulez-vous vraiment supprimer cette intervention ? Cette action ne peut pas être annulée.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                    <button onclick="confirmDelete()" class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-red-600 text-base font-medium text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 sm:ml-3 sm:w-auto sm:text-sm">
+                        <i class="fa fa-check mr-2"></i>Oui, supprimer
+                    </button>
+                    <button onclick="closeModal('delete-modal')" class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm">
+                        <i class="fa fa-times mr-2"></i>Annuler
+                    </button>
+                </div>
+                <input type="hidden" id="delete-intervention-id" value="">
+            </div>
+        </div>
+    </div>
 
     <script src="/nodetest/js/allInterventions.js"></script>
 </body>

@@ -1,4 +1,4 @@
-// utils/queryBuilder.js - SQL query organization (FIXED)
+// utils/queryBuilder.js - SQL query organization with Date Range Support (FIXED)
 
 const baseInterventionFields = `
     i.number as intervention_id,
@@ -71,32 +71,39 @@ function buildInterventionQuery(type, status = null) {
             -- Created within last 48 business hours
             CASE 
                 WHEN WEEKDAY(i.timestamp) IN (5, 6) THEN 
-                    -- Weekend creation: check if within 48h from next Monday 9 AM
                     TIMESTAMPDIFF(HOUR, 
                         DATE_ADD(DATE_ADD(i.timestamp, INTERVAL (7 - WEEKDAY(i.timestamp)) DAY), INTERVAL 9 HOUR),
                         NOW()
                     ) <= 48
                 ELSE 
-                    -- Business days: exclude weekends from hour calculation
                     (TIMESTAMPDIFF(HOUR, i.timestamp, NOW()) - 
                      (FLOOR(TIMESTAMPDIFF(HOUR, i.timestamp, NOW()) / 24) * 
                       CASE WHEN WEEKDAY(DATE_ADD(i.timestamp, INTERVAL FLOOR(TIMESTAMPDIFF(HOUR, i.timestamp, NOW()) / 24) DAY)) IN (5, 6) THEN 24 ELSE 0 END)
                     ) <= 48
             END
-            AND
-            -- Only include specific statuses
-            (ist.name LIKE '%planifi%' OR ist.name LIKE '%maintenance%' OR ist.name LIKE '%CDC%' OR ist.name LIKE '%SCH%' OR ist.name LIKE '%MOSELIS%' OR ist.name LIKE '%VIVEST%' OR ist.name = 'Reçue' OR ist.name = 'Assignée')
         )`;
-        query += ` ORDER BY hours_remaining ASC, i.uid DESC LIMIT 10`;
-    } else if (type === 'recent') {
-        query += ` AND i.timestamp >= DATE_SUB(NOW(), INTERVAL 7 DAY)`;
-        query += ` ORDER BY i.timestamp DESC LIMIT 10`;
-    } else if (type === 'filtered' && status) {
+    }
+    
+    // Add recent condition (last 30 days)
+    if (type === 'recent') {
+        query += ` AND i.timestamp >= DATE_SUB(NOW(), INTERVAL 30 DAY)`;
+    }
+    
+    // Add status filter
+    if (status) {
         const statusCondition = getStatusCondition(status);
         if (statusCondition) {
             query += ` AND ${statusCondition}`;
         }
-        query += ` ORDER BY i.timestamp DESC LIMIT ${status === 'urgent' ? '50' : '10'}`;
+    }
+    
+    // Default ordering
+    if (type === 'urgent') {
+        query += ` ORDER BY hours_remaining ASC, i.uid DESC LIMIT 10`;
+    } else if (type === 'recent') {
+        query += ` ORDER BY i.timestamp DESC LIMIT 10`;
+    } else {
+        query += ` ORDER BY i.timestamp DESC LIMIT ${status === 'billed' || status === 'paid' ? '50' : '10'}`;
     }
     
     return query;
@@ -149,34 +156,32 @@ function buildUrgentAllQuery(filters) {
             GREATEST(0, 48 - 
                 (TIMESTAMPDIFF(HOUR, i.timestamp, NOW()) - 
                  (FLOOR(TIMESTAMPDIFF(HOUR, i.timestamp, NOW()) / 24) * 
-                  CASE WHEN WEEKDAY(DATE_ADD(i.timestamp, INTERVAL FLOOR(TIMESTAMPDIFF(HOUR, i.timestamp, NOW()) / 24) DAY)) IN (5, 6) THEN 24 ELSE 0 END)
+                      CASE WHEN WEEKDAY(DATE_ADD(i.timestamp, INTERVAL FLOOR(TIMESTAMPDIFF(HOUR, i.timestamp, NOW()) / 24) DAY)) IN (5, 6) THEN 24 ELSE 0 END)
+                    )
                 )
-            )
-    END as hours_remaining`;
-
+        END as hours_remaining`;
+    
     baseQuery += baseInterventionJoins;
     
-    let whereConditions = ['i.uid != 0'];
-    
-    // Base urgent condition
-    whereConditions.push(`(
-        (i.technician_uid = 0 OR i.technician_uid IS NULL OR i.date_time IS NULL OR i.date_time = '')
-        AND
-        CASE 
-            WHEN WEEKDAY(i.timestamp) IN (5, 6) THEN 
-                TIMESTAMPDIFF(HOUR, 
-                    DATE_ADD(DATE_ADD(i.timestamp, INTERVAL (7 - WEEKDAY(i.timestamp)) DAY), INTERVAL 9 HOUR),
-                    NOW()
-                ) <= 48
-            ELSE 
-                (TIMESTAMPDIFF(HOUR, i.timestamp, NOW()) - 
-                 (FLOOR(TIMESTAMPDIFF(HOUR, i.timestamp, NOW()) / 24) * 
-                  CASE WHEN WEEKDAY(DATE_ADD(i.timestamp, INTERVAL FLOOR(TIMESTAMPDIFF(HOUR, i.timestamp, NOW()) / 24) DAY)) IN (5, 6) THEN 24 ELSE 0 END)
-                ) <= 48
-        END
-        AND
-        (ist.name LIKE '%planifi%' OR ist.name LIKE '%maintenance%' OR ist.name LIKE '%CDC%' OR ist.name LIKE '%SCH%' OR ist.name LIKE '%MOSELIS%' OR ist.name LIKE '%VIVEST%' OR ist.name = 'Reçue' OR ist.name = 'Assignée')
-    )`);
+    let whereConditions = [
+        'i.uid != 0',
+        `(
+            (i.technician_uid = 0 OR i.technician_uid IS NULL OR i.date_time IS NULL OR i.date_time = '')
+            AND
+            CASE 
+                WHEN WEEKDAY(i.timestamp) IN (5, 6) THEN 
+                    TIMESTAMPDIFF(HOUR, 
+                        DATE_ADD(DATE_ADD(i.timestamp, INTERVAL (7 - WEEKDAY(i.timestamp)) DAY), INTERVAL 9 HOUR),
+                        NOW()
+                    ) <= 48
+                ELSE 
+                    (TIMESTAMPDIFF(HOUR, i.timestamp, NOW()) - 
+                     (FLOOR(TIMESTAMPDIFF(HOUR, i.timestamp, NOW()) / 24) * 
+                      CASE WHEN WEEKDAY(DATE_ADD(i.timestamp, INTERVAL FLOOR(TIMESTAMPDIFF(HOUR, i.timestamp, NOW()) / 24) DAY)) IN (5, 6) THEN 24 ELSE 0 END)
+                    ) <= 48
+            END
+        )`
+    ];
 
     // Search filter
     if (search && search.trim() !== '') {
@@ -186,7 +191,8 @@ function buildUrgentAllQuery(filters) {
             i.title LIKE '%${searchTerm}%' OR 
             i.address LIKE '%${searchTerm}%' OR 
             i.city LIKE '%${searchTerm}%' OR
-            i.description LIKE '%${searchTerm}%'
+            i.description LIKE '%${searchTerm}%' OR
+            CONCAT(tech.firstname, ' ', tech.lastname) LIKE '%${searchTerm}%'
         )`);
     }
 
@@ -288,7 +294,7 @@ function buildUrgentAllQuery(filters) {
     return { query, countQuery };
 }
 
-// NEW: Build query for all recent interventions with filters
+// NEW: Build query for all recent interventions with filters and DATE RANGE support
 function buildAllRecentQuery(filters) {
     const {
         search = '',
@@ -352,19 +358,26 @@ function buildAllRecentQuery(filters) {
         }
     }
 
-    // Date filter
+    // Enhanced Date filter with range support
     if (date && date !== '') {
         console.log('Date filter - Raw input:', date);
         
-        // Convert YYYY-MM-DD to DD/MM/YYYY format (as stored in database)
-        const dateObj = new Date(date + 'T00:00:00'); // Add time to avoid timezone issues
-        const day = dateObj.getDate().toString().padStart(2, '0');
-        const month = (dateObj.getMonth() + 1).toString().padStart(2, '0');
-        const year = dateObj.getFullYear();
-        const formattedDate = `${day}/${month}/${year}`;
-        
-        console.log('Date filter - Input:', date, 'Formatted:', formattedDate);
-        whereConditions.push(`i.date_time LIKE '${formattedDate}%'`);
+        // Check if it's a date range (contains " - ")
+        if (date.includes(' - ')) {
+            const dateRange = date.split(' - ');
+            if (dateRange.length === 2) {
+                const startDate = convertToDbFormat(dateRange[0].trim());
+                const endDate = convertToDbFormat(dateRange[1].trim());
+                
+                console.log('Date range filter - Start:', startDate, 'End:', endDate);
+                whereConditions.push(`STR_TO_DATE(i.date_time, '%d/%m/%Y') BETWEEN STR_TO_DATE('${startDate}', '%d/%m/%Y') AND STR_TO_DATE('${endDate}', '%d/%m/%Y')`);
+            }
+        } else {
+            // Single date filtering
+            const formattedDate = convertToDbFormat(date);
+            console.log('Single date filter - Input:', date, 'Formatted:', formattedDate);
+            whereConditions.push(`i.date_time LIKE '${formattedDate}%'`);
+        }
     }
 
     const whereClause = whereConditions.length > 1 ? ' WHERE ' + whereConditions.join(' AND ') : ' WHERE ' + whereConditions[0];
@@ -418,6 +431,22 @@ function buildAllRecentQuery(filters) {
     console.log('Count query:', countQuery);
 
     return { query, countQuery };
+}
+
+// Helper function to convert YYYY-MM-DD to DD/MM/YYYY format (as stored in database)
+function convertToDbFormat(date) {
+    if (date.includes('/')) {
+        // Already in DD/MM/YYYY format
+        return date;
+    } else if (date.includes('-')) {
+        // Convert from YYYY-MM-DD to DD/MM/YYYY
+        const dateObj = new Date(date + 'T00:00:00'); // Add time to avoid timezone issues
+        const day = dateObj.getDate().toString().padStart(2, '0');
+        const month = (dateObj.getMonth() + 1).toString().padStart(2, '0');
+        const year = dateObj.getFullYear();
+        return `${day}/${month}/${year}`;
+    }
+    return date;
 }
 
 module.exports = { buildInterventionQuery, buildUrgentAllQuery, buildAllRecentQuery };

@@ -1,80 +1,106 @@
-// public/js/urgent.js - Urgent interventions page logic with actions
+// public/js/urgent.js - Enhanced urgent interventions page with description column
 
-// Global state
+// Global variables for managing state
 let currentPage = 1;
-let currentSort = { field: 'hours_remaining', order: 'asc' };
 let currentFilters = {
     search: '',
     status: '',
     missing: '',
     timeFilter: ''
 };
+let currentSort = {
+    field: 'hours_remaining',
+    order: 'asc'
+};
 
-// Initialize page
+// ============================================
+// Initialization
+// ============================================
+
 document.addEventListener('DOMContentLoaded', function() {
-    setupEventListeners();
+    console.log('Urgent interventions page loaded');
+    initializeEventListeners();
     loadUrgentInterventions();
-    
-    // Auto-refresh every 2 minutes
-    setInterval(loadUrgentInterventions, 120000);
 });
 
-function setupEventListeners() {
-    // Search input with debounce
-    let searchTimeout;
-    document.getElementById('search-input').addEventListener('input', function(e) {
-        clearTimeout(searchTimeout);
-        searchTimeout = setTimeout(() => {
-            currentFilters.search = e.target.value;
+function initializeEventListeners() {
+    // Filter event listeners
+    const searchInput = document.getElementById('search-input');
+    const statusFilter = document.getElementById('status-filter');
+    const missingFilter = document.getElementById('missing-filter');
+    const timeFilter = document.getElementById('time-filter');
+    
+    if (searchInput) {
+        let searchTimeout;
+        searchInput.addEventListener('input', function() {
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(() => {
+                currentFilters.search = this.value;
+                currentPage = 1;
+                loadUrgentInterventions();
+            }, 500);
+        });
+    }
+    
+    if (statusFilter) {
+        statusFilter.addEventListener('change', function() {
+            currentFilters.status = this.value;
             currentPage = 1;
             loadUrgentInterventions();
-        }, 500);
-    });
+        });
+    }
+    
+    if (missingFilter) {
+        missingFilter.addEventListener('change', function() {
+            currentFilters.missing = this.value;
+            currentPage = 1;
+            loadUrgentInterventions();
+        });
+    }
+    
+    if (timeFilter) {
+        timeFilter.addEventListener('change', function() {
+            currentFilters.timeFilter = this.value;
+            currentPage = 1;
+            loadUrgentInterventions();
+        });
+    }
 
-    // Filter dropdowns
-    document.getElementById('status-filter').addEventListener('change', function(e) {
-        currentFilters.status = e.target.value;
-        currentPage = 1;
-        loadUrgentInterventions();
-    });
-
-    document.getElementById('missing-filter').addEventListener('change', function(e) {
-        currentFilters.missing = e.target.value;
-        currentPage = 1;
-        loadUrgentInterventions();
-    });
-
-    document.getElementById('time-filter').addEventListener('change', function(e) {
-        currentFilters.timeFilter = e.target.value;
-        currentPage = 1;
-        loadUrgentInterventions();
-    });
-
-    // Page size change
-    document.getElementById('page-size').addEventListener('change', function(e) {
-        currentPage = 1;
-        loadUrgentInterventions();
-    });
-
-    // Event delegation for action buttons
+    // Modal event listeners
     document.addEventListener('click', function(e) {
-        if (e.target.closest('.assign-technician-btn')) {
-            const interventionId = e.target.closest('.assign-technician-btn').dataset.interventionId;
+        if (e.target.classList.contains('assign-technician-btn')) {
+            const interventionId = e.target.getAttribute('data-intervention-id');
             assignTechnician(interventionId);
-        } else if (e.target.closest('.assign-date-btn')) {
-            const interventionId = e.target.closest('.assign-date-btn').dataset.interventionId;
+        } else if (e.target.classList.contains('assign-date-btn')) {
+            const interventionId = e.target.getAttribute('data-intervention-id');
             setDate(interventionId);
+        }
+    });
+    
+    // Close modals when clicking outside
+    document.addEventListener('click', function(e) {
+        if (e.target.classList.contains('modal')) {
+            const modals = ['technician-modal', 'date-modal'];
+            modals.forEach(modalId => {
+                const modal = document.getElementById(modalId);
+                if (modal && !modal.classList.contains('hidden')) {
+                    closeModal(modalId);
+                }
+            });
         }
     });
 }
 
+// ============================================
+// Data Loading Functions
+// ============================================
+
 function loadUrgentInterventions() {
-    const pageSize = document.getElementById('page-size').value || 25;
+    console.log('Loading urgent interventions with filters:', currentFilters);
     
-    // Build query parameters
     const params = new URLSearchParams({
         page: currentPage,
-        limit: pageSize,
+        limit: document.getElementById('results-per-page')?.value || '25',
         search: currentFilters.search,
         status: currentFilters.status,
         missing: currentFilters.missing,
@@ -83,7 +109,6 @@ function loadUrgentInterventions() {
         sortOrder: currentSort.order
     });
 
-    // Fetch data
     fetch(`/nodetest/api/urgent-all?${params}`)
         .then(response => {
             if (!response.ok) {
@@ -108,7 +133,7 @@ function displayInterventions(interventions) {
     if (!interventions || interventions.length === 0) {
         tableBody.innerHTML = `
             <tr>
-                <td colspan="8" class="px-6 py-8 text-center text-gray-500">
+                <td colspan="9" class="px-6 py-8 text-center text-gray-500">
                     <i class="fa fa-info-circle mr-2"></i>Aucune intervention urgente trouvée
                 </td>
             </tr>
@@ -150,6 +175,11 @@ function displayInterventions(interventions) {
                         ${escapeHtml(intervention.title || 'Sans titre')}
                     </div>
                 </td>
+                <td class="px-6 py-4 text-sm text-gray-900 description-cell">
+                    <div class="description-column" title="${escapeHtml(intervention.description || 'Aucune description')}">
+                        ${escapeHtml(truncateText(intervention.description || 'Aucune description', 40))}
+                    </div>
+                </td>
                 <td class="px-6 py-4 text-sm text-gray-900">
                     <div class="max-w-xs truncate" title="${escapeHtml(intervention.address || '')}">
                         ${escapeHtml(intervention.address || 'Adresse non définie')}
@@ -184,6 +214,109 @@ function displayInterventions(interventions) {
 
     tableBody.innerHTML = rows.join('');
 }
+
+function displayError(message) {
+    const tableBody = document.getElementById('urgent-table');
+    tableBody.innerHTML = `
+        <tr>
+            <td colspan="9" class="px-6 py-8 text-center text-red-500">
+                <i class="fa fa-exclamation-triangle mr-2"></i>${escapeHtml(message)}
+            </td>
+        </tr>
+    `;
+}
+
+// ============================================
+// Utility Functions
+// ============================================
+
+function truncateText(text, maxLength) {
+    if (!text || text.length <= maxLength) return text;
+    return text.substring(0, maxLength).trim() + '...';
+}
+
+function escapeHtml(text) {
+    if (!text) return '';
+    const map = {
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#039;'
+    };
+    return text.toString().replace(/[&<>"']/g, function(m) { return map[m]; });
+}
+
+function getTimeRemainingClass(hoursRemaining) {
+    if (hoursRemaining <= 0) return 'bg-red-100 text-red-800';
+    if (hoursRemaining <= 6) return 'bg-red-100 text-red-800';
+    if (hoursRemaining <= 12) return 'bg-orange-100 text-orange-800';
+    if (hoursRemaining <= 24) return 'bg-yellow-100 text-yellow-800';
+    return 'bg-green-100 text-green-800';
+}
+
+function getStatusClass(status) {
+    if (!status) return 'bg-gray-100 text-gray-800';
+    const lowerStatus = status.toLowerCase();
+    
+    if (lowerStatus.includes('reçu') || lowerStatus.includes('nouveau')) {
+        return 'bg-blue-100 text-blue-800';
+    } else if (lowerStatus.includes('assigné') || lowerStatus.includes('planifié')) {
+        return 'bg-yellow-100 text-yellow-800';
+    } else if (lowerStatus.includes('cours') || lowerStatus.includes('démarré')) {
+        return 'bg-orange-100 text-orange-800';
+    } else if (lowerStatus.includes('terminé') || lowerStatus.includes('fini')) {
+        return 'bg-green-100 text-green-800';
+    }
+    return 'bg-gray-100 text-gray-800';
+}
+
+function getMissingInfoClass(missingInfo) {
+    if (!missingInfo || missingInfo === 'Complet') return 'bg-green-100 text-green-800';
+    return 'bg-red-100 text-red-800';
+}
+
+function getStatusIconHtml(status) {
+    if (!status) return '<i class="fa fa-question-circle mr-1"></i>';
+    const lowerStatus = status.toLowerCase();
+    
+    if (lowerStatus.includes('reçu') || lowerStatus.includes('nouveau')) {
+        return '<i class="fa fa-inbox mr-1"></i>';
+    } else if (lowerStatus.includes('assigné') || lowerStatus.includes('planifié')) {
+        return '<i class="fa fa-user-check mr-1"></i>';
+    } else if (lowerStatus.includes('cours') || lowerStatus.includes('démarré')) {
+        return '<i class="fa fa-play mr-1"></i>';
+    } else if (lowerStatus.includes('terminé') || lowerStatus.includes('fini')) {
+        return '<i class="fa fa-check-circle mr-1"></i>';
+    }
+    return '<i class="fa fa-circle mr-1"></i>';
+}
+
+function getMissingIcon(missingInfo) {
+    if (!missingInfo || missingInfo === 'Complet') return '<i class="fa fa-check mr-1"></i>';
+    if (missingInfo.includes('Technicien')) return '<i class="fa fa-user-times mr-1"></i>';
+    if (missingInfo.includes('Date')) return '<i class="fa fa-calendar-times mr-1"></i>';
+    return '<i class="fa fa-exclamation mr-1"></i>';
+}
+
+function getTimeIcon(hoursRemaining) {
+    if (hoursRemaining <= 0) return '<i class="fa fa-exclamation-triangle mr-1"></i>';
+    if (hoursRemaining <= 6) return '<i class="fa fa-clock mr-1"></i>';
+    if (hoursRemaining <= 12) return '<i class="fa fa-clock mr-1"></i>';
+    if (hoursRemaining <= 24) return '<i class="fa fa-clock mr-1"></i>';
+    return '<i class="fa fa-clock mr-1"></i>';
+}
+
+function formatTimeRemaining(hours) {
+    if (hours === null || hours === undefined) return 'N/A';
+    if (hours <= 0) return 'Expiré';
+    if (hours < 1) return Math.round(hours * 60) + 'min';
+    return Math.round(hours) + 'h';
+}
+
+// ============================================
+// Pagination Functions
+// ============================================
 
 function updatePagination(pagination) {
     if (!pagination) return;
@@ -240,9 +373,17 @@ function updateStats(totalCount) {
     document.getElementById('total-count').textContent = `${totalCount} intervention(s) urgente(s)`;
 }
 
-// Navigation functions
+// ============================================
+// Navigation Functions
+// ============================================
+
 function goToPage(page) {
     currentPage = page;
+    loadUrgentInterventions();
+}
+
+function changeResultsPerPage() {
+    currentPage = 1;
     loadUrgentInterventions();
 }
 
@@ -279,7 +420,10 @@ function refreshData() {
     loadUrgentInterventions();
 }
 
-// Action functions
+// ============================================
+// Action Functions
+// ============================================
+
 function assignTechnician(interventionId) {
     console.log('Assigning technician to intervention:', interventionId);
     openTechnicianModal(interventionId);
@@ -296,7 +440,10 @@ function viewDetails(interventionId) {
     alert(`Voir les détails de l'intervention ${interventionId} - À implémenter`);
 }
 
-// Modal functions
+// ============================================
+// Modal Functions
+// ============================================
+
 function openTechnicianModal(interventionId) {
     const modal = document.getElementById('technician-modal');
     if (modal) {
@@ -345,24 +492,22 @@ async function loadTechniciansForModal() {
         const technicians = await response.json();
         const select = document.getElementById('technician-select');
         
-        // Clear existing options
-        select.innerHTML = '<option value="">Sélectionner un technicien</option>';
-        
-        // Add technicians
-        technicians.forEach(technician => {
-            const option = document.createElement('option');
-            option.value = technician.technician_id;
-            option.textContent = technician.name;
-            select.appendChild(option);
-        });
-        
+        if (select) {
+            select.innerHTML = '<option value="">Sélectionner un technicien</option>';
+            technicians.forEach(tech => {
+                select.innerHTML += `<option value="${tech.uid}">${tech.firstname} ${tech.lastname}</option>`;
+            });
+        }
     } catch (error) {
-        console.error('Error loading technicians for modal:', error);
-        alert('Erreur lors du chargement des techniciens');
+        console.error('Error loading technicians:', error);
+        const select = document.getElementById('technician-select');
+        if (select) {
+            select.innerHTML = '<option value="">Erreur lors du chargement</option>';
+        }
     }
 }
 
-async function saveTechnicianAssignment() {
+async function confirmTechnicianAssignment() {
     const interventionId = document.getElementById('modal-intervention-id').value;
     const technicianId = document.getElementById('technician-select').value;
     
@@ -375,7 +520,7 @@ async function saveTechnicianAssignment() {
         const response = await fetch('/nodetest/api/assign-technician', {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json'
+                'Content-Type': 'application/json',
             },
             body: JSON.stringify({
                 interventionId: interventionId,
@@ -383,27 +528,22 @@ async function saveTechnicianAssignment() {
             })
         });
         
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        
         const result = await response.json();
         
         if (result.success) {
-            alert('Technicien assigné avec succès!');
+            alert('Technicien assigné avec succès');
             closeModal('technician-modal');
-            loadUrgentInterventions(); // Reload the table
+            loadUrgentInterventions(); // Refresh the table
         } else {
-            alert('Erreur lors de l\'assignation: ' + (result.message || 'Erreur inconnue'));
+            alert('Erreur: ' + (result.message || 'Échec de l\'assignation'));
         }
-        
     } catch (error) {
         console.error('Error assigning technician:', error);
         alert('Erreur lors de l\'assignation du technicien');
     }
 }
 
-async function saveDateAssignment() {
+async function confirmDateAssignment() {
     const interventionId = document.getElementById('date-modal-intervention-id').value;
     const date = document.getElementById('intervention-date').value;
     const time = document.getElementById('intervention-time').value;
@@ -413,141 +553,34 @@ async function saveDateAssignment() {
         return;
     }
     
-    // Format date to DD/MM/YYYY format (as used in the old system)
-    const dateObj = new Date(date);
-    const formattedDate = `${dateObj.getDate().toString().padStart(2, '0')}/${(dateObj.getMonth() + 1).toString().padStart(2, '0')}/${dateObj.getFullYear()}`;
+    // Convert date from YYYY-MM-DD to DD/MM/YYYY format (as used in old system)
+    const dateParts = date.split('-');
+    const formattedDate = `${dateParts[2]}/${dateParts[1]}/${dateParts[0]}`;
     
     try {
         const response = await fetch('/nodetest/api/assign-date', {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json'
+                'Content-Type': 'application/json',
             },
             body: JSON.stringify({
                 interventionId: interventionId,
                 date: formattedDate,
-                time: time || ''
+                time: time
             })
         });
-        
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
         
         const result = await response.json();
         
         if (result.success) {
-            alert('Date assignée avec succès!');
+            alert('Date assignée avec succès');
             closeModal('date-modal');
-            loadUrgentInterventions(); // Reload the table
+            loadUrgentInterventions(); // Refresh the table
         } else {
-            alert('Erreur lors de l\'assignation: ' + (result.message || 'Erreur inconnue'));
+            alert('Erreur: ' + (result.message || 'Échec de l\'assignation de la date'));
         }
-        
     } catch (error) {
         console.error('Error assigning date:', error);
         alert('Erreur lors de l\'assignation de la date');
     }
-}
-
-function displayError(message) {
-    const tableBody = document.getElementById('urgent-table');
-    tableBody.innerHTML = `
-        <tr>
-            <td colspan="8" class="px-6 py-8 text-center text-red-500">
-                <i class="fa fa-exclamation-triangle mr-2"></i>${message}
-            </td>
-        </tr>
-    `;
-}
-
-// Utility functions
-function escapeHtml(unsafe) {
-    if (!unsafe) return '';
-    return unsafe
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;")
-        .replace(/'/g, "&#039;");
-}
-
-function getStatusClass(status) {
-    const statusClasses = {
-        'Reçue': 'bg-yellow-100 text-yellow-800 border border-yellow-300',
-        'Assignée': 'bg-indigo-100 text-indigo-800 border border-indigo-300',
-        'Planifiée': 'bg-blue-100 text-blue-800 border border-blue-300',
-        'En cours': 'bg-orange-100 text-orange-800 border border-orange-300',
-        'Terminée': 'bg-green-100 text-green-800 border border-green-300',
-        'Facturée': 'bg-gray-100 text-gray-800 border border-gray-300',
-        'Payée': 'bg-emerald-100 text-emerald-800 border border-emerald-300',
-        'Maintenance SCH': 'bg-orange-100 text-orange-800 border border-orange-300',
-        'Maintenance VIVEST': 'bg-red-100 text-red-800 border border-red-300',
-        'Maintenance Moselis': 'bg-teal-100 text-teal-800 border border-teal-300',
-        'Maintenance CDC': 'bg-cyan-100 text-cyan-800 border border-cyan-300',
-        'Maintenance CDC Habitat': 'bg-lime-100 text-lime-800 border border-lime-300',
-        'CHANTIER': 'bg-pink-100 text-pink-800 border border-pink-300',
-        'Pausée': 'bg-slate-100 text-slate-800 border border-slate-300',
-        'Annulée': 'bg-red-100 text-red-800 border border-red-300'
-    };
-    return statusClasses[status] || 'bg-gray-100 text-gray-800 border border-gray-300';
-}
-
-function getTimeRemainingClass(hours) {
-    if (hours <= 0) return 'bg-red-100 text-red-800 border border-red-300';
-    if (hours <= 6) return 'bg-red-100 text-red-800 border border-red-300';
-    if (hours <= 12) return 'bg-orange-100 text-orange-800 border border-orange-300';
-    if (hours <= 24) return 'bg-yellow-100 text-yellow-800 border border-yellow-300';
-    return 'bg-green-100 text-green-800 border border-green-300';
-}
-
-function getMissingInfoClass(missingInfo) {
-    const missingClasses = {
-        'Technicien manquant': 'bg-orange-100 text-orange-800 border border-orange-300',
-        'Date manquante': 'bg-yellow-100 text-yellow-800 border border-yellow-300',
-        'Technicien et Date manquants': 'bg-red-100 text-red-800 border border-red-300',
-        'Complet': 'bg-green-100 text-green-800 border border-green-300'
-    };
-    return missingClasses[missingInfo] || 'bg-gray-100 text-gray-800 border border-gray-300';
-}
-
-function getStatusIconHtml(status) {
-    const statusIcons = {
-        'Reçue': '<i class="fas fa-inbox mr-1"></i>',
-        'Assignée': '<i class="fas fa-user-check mr-1"></i>',
-        'Planifiée': '<i class="fas fa-calendar-check mr-1"></i>',
-        'En cours': '<i class="fas fa-cogs mr-1"></i>',
-        'Terminée': '<i class="fas fa-check-circle mr-1"></i>',
-        'Facturée': '<i class="fas fa-file-invoice mr-1"></i>',
-        'Payée': '<i class="fas fa-credit-card mr-1"></i>',
-        'Pausée': '<i class="fas fa-pause-circle mr-1"></i>',
-        'Annulée': '<i class="fas fa-times-circle mr-1"></i>'
-    };
-    return statusIcons[status] || '<i class="fas fa-circle mr-1"></i>';
-}
-
-function getTimeIcon(hours) {
-    if (hours <= 0) return '<i class="fas fa-exclamation-triangle mr-1"></i>';
-    if (hours <= 6) return '<i class="fas fa-clock mr-1"></i>';
-    if (hours <= 12) return '<i class="fas fa-hourglass-half mr-1"></i>';
-    if (hours <= 24) return '<i class="fas fa-hourglass-start mr-1"></i>';
-    return '<i class="fas fa-check mr-1"></i>';
-}
-
-function getMissingIcon(missingInfo) {
-    const missingIcons = {
-        'Technicien manquant': '<i class="fas fa-user-times mr-1"></i>',
-        'Date manquante': '<i class="fas fa-calendar-times mr-1"></i>',
-        'Technicien et Date manquants': '<i class="fas fa-exclamation-triangle mr-1"></i>',
-        'Complet': '<i class="fas fa-check-circle mr-1"></i>'
-    };
-    return missingIcons[missingInfo] || '<i class="fas fa-question-circle mr-1"></i>';
-}
-
-function formatTimeRemaining(hours) {
-    if (hours === null || hours === undefined) return 'N/A';
-    if (hours <= 0) return 'Expiré';
-    if (hours < 1) return `${Math.round(hours * 60)} min`;
-    if (hours < 24) return `${Math.round(hours)}h`;
-    return `${Math.round(hours / 24)}j`;
 }

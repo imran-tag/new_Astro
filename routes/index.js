@@ -1,6 +1,7 @@
-// routes/index.js - Main route organization (FIXED for Node.js v12)
+// routes/index.js - Main route organization with Public Intervention
 const express = require('express');
 const router = express.Router();
+const path = require('path');
 const { getDashboardHTML } = require('../views/dashboard');
 const { getUrgentInterventionsHTML } = require('../views/urgentInterventions');
 
@@ -8,7 +9,7 @@ const { getUrgentInterventionsHTML } = require('../views/urgentInterventions');
 const apiRoutes = require('./api');
 
 // Try to import the new views, with error handling
-let getAllInterventionsHTML, getCreateInterventionHTML;
+let getAllInterventionsHTML, getCreateInterventionHTML, getPublicInterventionHTML;
 try {
     ({ getAllInterventionsHTML } = require('../views/allInterventions'));
 } catch (error) {
@@ -19,6 +20,12 @@ try {
     ({ getCreateInterventionHTML } = require('../views/createIntervention'));
 } catch (error) {
     console.error('Error importing createIntervention view:', error.message);
+}
+
+try {
+    ({ getPublicInterventionHTML } = require('../views/publicIntervention'));
+} catch (error) {
+    console.error('Error importing publicIntervention view:', error.message);
 }
 
 // Main routes
@@ -60,6 +67,19 @@ router.get('/nodetest/create-intervention', (req, res) => {
         res.status(500).send('Create intervention view not available');
     }
 });
+
+// NEW: Public intervention page
+router.get('/nodetest/interventions/public/:interventionId', (req, res) => {
+    if (getPublicInterventionHTML) {
+        res.setHeader('Content-Type', 'text/html; charset=utf-8');
+        res.send(getPublicInterventionHTML());
+    } else {
+        res.status(500).send('Public intervention view not available');
+    }
+});
+
+// NEW: Serve generated files (PDFs, documents)
+router.use('/nodetest/generated', express.static(path.join(__dirname, '../generated')));
 
 // API routes
 router.use('/nodetest/api', apiRoutes);

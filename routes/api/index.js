@@ -1,4 +1,4 @@
-// routes/api/index.js - API route organization (FIXED for Node.js v12)
+// routes/api/index.js - API route organization with Action Endpoints
 const express = require('express');
 const router = express.Router();
 
@@ -26,6 +26,12 @@ router.get('/technicians', interventionsController.getTechnicians);
 // Assignment endpoints
 router.post('/assign-technician', interventionsController.assignTechnician);
 router.post('/assign-date', interventionsController.assignDate);
+
+// NEW: Action endpoints for interventions
+router.post('/generate-rapport', interventionsController.generateRapport);
+router.post('/generate-quitus', interventionsController.generateQuitus);
+router.delete('/delete-intervention', interventionsController.deleteIntervention);
+router.get('/public-intervention/:interventionId', interventionsController.getPublicIntervention);
 
 // Create intervention endpoints (with error handling)
 try {
