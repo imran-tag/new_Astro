@@ -47,10 +47,24 @@ function getHeaderHTML() {
 function getMainContentHTML() {
     return `
     <main class="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
-        <!-- Titre du Tableau de Bord -->
+        <!-- Titre du Tableau de Bord avec bouton Nouvelle Intervention -->
         <div class="mb-8">
-            <h1 class="text-3xl font-bold text-gray-900">Tableau de Bord</h1>
-            <p class="text-gray-600 mt-2">Vue d'ensemble de vos interventions techniques</p>
+            <div class="flex justify-between items-center">
+                <div>
+                    <h1 class="text-3xl font-bold text-gray-900">Tableau de Bord</h1>
+                    <p class="text-gray-600 mt-2">Vue d'ensemble de vos interventions techniques</p>
+                </div>
+                <div class="flex space-x-3">
+                    <a href="/nodetest/create-intervention" class="inline-flex items-center px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors">
+                        <i class="fas fa-plus mr-2"></i>
+                        Nouvelle Intervention
+                    </a>
+                    <button onclick="loadDashboardData()" class="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors">
+                        <i class="fas fa-sync-alt mr-2"></i>
+                        Actualiser
+                    </button>
+                </div>
+            </div>
         </div>
 
         <!-- Section Statistiques -->
@@ -182,7 +196,7 @@ function getMainContentHTML() {
             </div>
         </div>
 
-        <!-- Section Interventions Filtrées (cachée initialement) -->
+        <!-- Section Filtrée (masquée par défaut) -->
         <div id="filtered-section" class="mb-8 hidden">
             <div class="flex justify-between items-center mb-4">
                 <h2 class="text-2xl font-semibold text-gray-900 flex items-center">

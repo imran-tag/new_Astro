@@ -1,4 +1,4 @@
-// public/js/urgent.js - Urgent interventions page logic
+// public/js/urgent.js - Urgent interventions page logic with actions
 
 // Global state
 let currentPage = 1;
@@ -55,6 +55,17 @@ function setupEventListeners() {
         currentPage = 1;
         loadUrgentInterventions();
     });
+
+    // Event delegation for action buttons
+    document.addEventListener('click', function(e) {
+        if (e.target.closest('.assign-technician-btn')) {
+            const interventionId = e.target.closest('.assign-technician-btn').dataset.interventionId;
+            assignTechnician(interventionId);
+        } else if (e.target.closest('.assign-date-btn')) {
+            const interventionId = e.target.closest('.assign-date-btn').dataset.interventionId;
+            setDate(interventionId);
+        }
+    });
 }
 
 function loadUrgentInterventions() {
@@ -110,6 +121,25 @@ function displayInterventions(interventions) {
         const statusClass = getStatusClass(intervention.status);
         const missingClass = getMissingInfoClass(intervention.missing_info);
         
+        // Determine which actions are needed
+        const needsTechnician = intervention.technician_uid == 0 || intervention.technician_uid == null;
+        const needsDate = !intervention.date_time || intervention.date_time === '';
+        
+        let actionButtons = '';
+        if (needsTechnician) {
+            actionButtons += `<button class="assign-technician-btn inline-flex items-center px-2 py-1 text-xs font-medium text-blue-600 bg-blue-100 rounded hover:bg-blue-200 mr-1 mb-1" data-intervention-id="${escapeHtml(intervention.intervention_id)}">
+                <i class="fas fa-user-plus mr-1"></i>Technicien
+            </button>`;
+        }
+        if (needsDate) {
+            actionButtons += `<button class="assign-date-btn inline-flex items-center px-2 py-1 text-xs font-medium text-green-600 bg-green-100 rounded hover:bg-green-200 mr-1 mb-1" data-intervention-id="${escapeHtml(intervention.intervention_id)}">
+                <i class="fas fa-calendar-plus mr-1"></i>Date
+            </button>`;
+        }
+        if (!needsTechnician && !needsDate) {
+            actionButtons = `<span class="text-xs text-gray-500 italic">Complet</span>`;
+        }
+        
         return `
             <tr class="hover:bg-gray-50 ${intervention.hours_remaining <= 0 ? 'urgent-row' : ''}">
                 <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
@@ -137,79 +167,29 @@ function displayInterventions(interventions) {
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap">
                     <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${timeClass}">
-                        ${getTimeIcon(intervention.hours_remaining || 0)} ${formatTimeRemaining(intervention.hours_remaining || 0)}
+                        ${getTimeIcon(intervention.hours_remaining)} ${formatTimeRemaining(intervention.hours_remaining)}
                     </span>
                 </td>
-                <td class="px-6 py-4 text-sm text-gray-900">
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                     ${escapeHtml(intervention.assigned_to || 'Non assigné')}
                 </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                    <div class="flex space-x-2">
-                        ${getActionButtons(intervention)}
+                <td class="px-6 py-4 whitespace-nowrap text-sm">
+                    <div class="flex flex-wrap">
+                        ${actionButtons}
                     </div>
                 </td>
             </tr>
         `;
-    }).join('');
+    });
 
-    tableBody.innerHTML = rows;
-}
-
-function getActionButtons(intervention) {
-    let buttons = [];
-    
-    // If technician is missing
-    if (!intervention.technician_uid || intervention.technician_uid == 0) {
-        buttons.push(`
-            <button onclick="assignTechnician('${intervention.intervention_id}')" 
-                    class="bg-blue-600 hover:bg-blue-700 text-white px-2 py-1 rounded text-xs">
-                <i class="fa fa-user-plus mr-1"></i>Assigner
-            </button>
-        `);
-    }
-    
-    // If date is missing
-    if (!intervention.date_time || intervention.date_time === '') {
-        buttons.push(`
-            <button onclick="setDate('${intervention.intervention_id}')" 
-                    class="bg-green-600 hover:bg-green-700 text-white px-2 py-1 rounded text-xs">
-                <i class="fa fa-calendar mr-1"></i>Date
-            </button>
-        `);
-    }
-    
-    // Always show details button
-    buttons.push(`
-        <button onclick="viewDetails('${intervention.intervention_id}')" 
-                class="bg-gray-600 hover:bg-gray-700 text-white px-2 py-1 rounded text-xs">
-            <i class="fa fa-eye mr-1"></i>Voir
-        </button>
-    `);
-    
-    return buttons.join('');
-}
-
-function displayError(message) {
-    const tableBody = document.getElementById('urgent-table');
-    tableBody.innerHTML = `
-        <tr>
-            <td colspan="8" class="px-6 py-8 text-center text-red-500">
-                <i class="fa fa-exclamation-triangle mr-2"></i>${escapeHtml(message)}
-            </td>
-        </tr>
-    `;
+    tableBody.innerHTML = rows.join('');
 }
 
 function updatePagination(pagination) {
-    const {
-        currentPage = 1,
-        totalPages = 0,
-        totalCount = 0,
-        hasNextPage = false,
-        hasPrevPage = false,
-        limit = 25
-    } = pagination;
-
+    if (!pagination) return;
+    
+    const { currentPage, totalPages, hasNextPage, hasPrevPage, limit, totalCount } = pagination;
+    
     // Update showing info
     const start = totalCount === 0 ? 0 : ((currentPage - 1) * limit) + 1;
     const end = Math.min(currentPage * limit, totalCount);
@@ -299,20 +279,186 @@ function refreshData() {
     loadUrgentInterventions();
 }
 
-// Action functions (to be implemented based on your workflow)
+// Action functions
 function assignTechnician(interventionId) {
-    alert(`Assigner un technicien à l'intervention ${interventionId}`);
-    // TODO: Open modal or redirect to assignment page
+    console.log('Assigning technician to intervention:', interventionId);
+    openTechnicianModal(interventionId);
 }
 
 function setDate(interventionId) {
-    alert(`Définir une date pour l'intervention ${interventionId}`);
-    // TODO: Open date picker modal
+    console.log('Setting date for intervention:', interventionId);
+    openDateModal(interventionId);
 }
 
 function viewDetails(interventionId) {
-    alert(`Voir les détails de l'intervention ${interventionId}`);
-    // TODO: Open details modal or redirect to details page
+    console.log('Viewing details for intervention:', interventionId);
+    // TODO: Implement details view
+    alert(`Voir les détails de l'intervention ${interventionId} - À implémenter`);
+}
+
+// Modal functions
+function openTechnicianModal(interventionId) {
+    const modal = document.getElementById('technician-modal');
+    if (modal) {
+        document.getElementById('modal-intervention-id').value = interventionId;
+        document.getElementById('technician-modal-title').textContent = `Assigner un technicien - Intervention #${interventionId}`;
+        modal.classList.remove('hidden');
+        loadTechniciansForModal();
+    }
+}
+
+function openDateModal(interventionId) {
+    const modal = document.getElementById('date-modal');
+    if (modal) {
+        document.getElementById('date-modal-intervention-id').value = interventionId;
+        document.getElementById('date-modal-title').textContent = `Définir une date - Intervention #${interventionId}`;
+        
+        // Set minimum date to today
+        const today = new Date().toISOString().split('T')[0];
+        document.getElementById('intervention-date').min = today;
+        
+        modal.classList.remove('hidden');
+    }
+}
+
+function closeModal(modalId) {
+    const modal = document.getElementById(modalId);
+    if (modal) {
+        modal.classList.add('hidden');
+        // Reset forms
+        if (modalId === 'technician-modal') {
+            document.getElementById('technician-select').value = '';
+        } else if (modalId === 'date-modal') {
+            document.getElementById('intervention-date').value = '';
+            document.getElementById('intervention-time').value = '';
+        }
+    }
+}
+
+async function loadTechniciansForModal() {
+    try {
+        const response = await fetch('/nodetest/api/technicians');
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const technicians = await response.json();
+        const select = document.getElementById('technician-select');
+        
+        // Clear existing options
+        select.innerHTML = '<option value="">Sélectionner un technicien</option>';
+        
+        // Add technicians
+        technicians.forEach(technician => {
+            const option = document.createElement('option');
+            option.value = technician.technician_id;
+            option.textContent = technician.name;
+            select.appendChild(option);
+        });
+        
+    } catch (error) {
+        console.error('Error loading technicians for modal:', error);
+        alert('Erreur lors du chargement des techniciens');
+    }
+}
+
+async function saveTechnicianAssignment() {
+    const interventionId = document.getElementById('modal-intervention-id').value;
+    const technicianId = document.getElementById('technician-select').value;
+    
+    if (!technicianId) {
+        alert('Veuillez sélectionner un technicien');
+        return;
+    }
+    
+    try {
+        const response = await fetch('/nodetest/api/assign-technician', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                interventionId: interventionId,
+                technicianId: technicianId
+            })
+        });
+        
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            alert('Technicien assigné avec succès!');
+            closeModal('technician-modal');
+            loadUrgentInterventions(); // Reload the table
+        } else {
+            alert('Erreur lors de l\'assignation: ' + (result.message || 'Erreur inconnue'));
+        }
+        
+    } catch (error) {
+        console.error('Error assigning technician:', error);
+        alert('Erreur lors de l\'assignation du technicien');
+    }
+}
+
+async function saveDateAssignment() {
+    const interventionId = document.getElementById('date-modal-intervention-id').value;
+    const date = document.getElementById('intervention-date').value;
+    const time = document.getElementById('intervention-time').value;
+    
+    if (!date) {
+        alert('Veuillez sélectionner une date');
+        return;
+    }
+    
+    // Format date to DD/MM/YYYY format (as used in the old system)
+    const dateObj = new Date(date);
+    const formattedDate = `${dateObj.getDate().toString().padStart(2, '0')}/${(dateObj.getMonth() + 1).toString().padStart(2, '0')}/${dateObj.getFullYear()}`;
+    
+    try {
+        const response = await fetch('/nodetest/api/assign-date', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                interventionId: interventionId,
+                date: formattedDate,
+                time: time || ''
+            })
+        });
+        
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            alert('Date assignée avec succès!');
+            closeModal('date-modal');
+            loadUrgentInterventions(); // Reload the table
+        } else {
+            alert('Erreur lors de l\'assignation: ' + (result.message || 'Erreur inconnue'));
+        }
+        
+    } catch (error) {
+        console.error('Error assigning date:', error);
+        alert('Erreur lors de l\'assignation de la date');
+    }
+}
+
+function displayError(message) {
+    const tableBody = document.getElementById('urgent-table');
+    tableBody.innerHTML = `
+        <tr>
+            <td colspan="8" class="px-6 py-8 text-center text-red-500">
+                <i class="fa fa-exclamation-triangle mr-2"></i>${message}
+            </td>
+        </tr>
+    `;
 }
 
 // Utility functions
@@ -326,6 +472,27 @@ function escapeHtml(unsafe) {
         .replace(/'/g, "&#039;");
 }
 
+function getStatusClass(status) {
+    const statusClasses = {
+        'Reçue': 'bg-yellow-100 text-yellow-800 border border-yellow-300',
+        'Assignée': 'bg-indigo-100 text-indigo-800 border border-indigo-300',
+        'Planifiée': 'bg-blue-100 text-blue-800 border border-blue-300',
+        'En cours': 'bg-orange-100 text-orange-800 border border-orange-300',
+        'Terminée': 'bg-green-100 text-green-800 border border-green-300',
+        'Facturée': 'bg-gray-100 text-gray-800 border border-gray-300',
+        'Payée': 'bg-emerald-100 text-emerald-800 border border-emerald-300',
+        'Maintenance SCH': 'bg-orange-100 text-orange-800 border border-orange-300',
+        'Maintenance VIVEST': 'bg-red-100 text-red-800 border border-red-300',
+        'Maintenance Moselis': 'bg-teal-100 text-teal-800 border border-teal-300',
+        'Maintenance CDC': 'bg-cyan-100 text-cyan-800 border border-cyan-300',
+        'Maintenance CDC Habitat': 'bg-lime-100 text-lime-800 border border-lime-300',
+        'CHANTIER': 'bg-pink-100 text-pink-800 border border-pink-300',
+        'Pausée': 'bg-slate-100 text-slate-800 border border-slate-300',
+        'Annulée': 'bg-red-100 text-red-800 border border-red-300'
+    };
+    return statusClasses[status] || 'bg-gray-100 text-gray-800 border border-gray-300';
+}
+
 function getTimeRemainingClass(hours) {
     if (hours <= 0) return 'bg-red-100 text-red-800 border border-red-300';
     if (hours <= 6) return 'bg-red-100 text-red-800 border border-red-300';
@@ -334,74 +501,53 @@ function getTimeRemainingClass(hours) {
     return 'bg-green-100 text-green-800 border border-green-300';
 }
 
-function getStatusClass(status) {
-    const statusClasses = {
-        'Reçue': 'bg-blue-100 text-blue-800 border border-blue-300',
-        'Assignée': 'bg-yellow-100 text-yellow-800 border border-yellow-300',
-        'Planifiée': 'bg-green-100 text-green-800 border border-green-300',
-        'En cours': 'bg-purple-100 text-purple-800 border border-purple-300',
-        'Terminée': 'bg-gray-100 text-gray-800 border border-gray-300',
-        'Maintenance SCH': 'bg-orange-100 text-orange-800 border border-orange-300',
-        'Maintenance vivest': 'bg-red-100 text-red-800 border border-red-300',
-        'Maintenance Moselis': 'bg-teal-100 text-teal-800 border border-teal-300',
-        'Maintenance CDC': 'bg-cyan-100 text-cyan-800 border border-cyan-300',
-        'Maintenance CDC Habitat': 'bg-lime-100 text-lime-800 border border-lime-300'
-    };
-    return statusClasses[status] || 'bg-cyan-100 text-cyan-800 border border-cyan-300';
-}
-
 function getMissingInfoClass(missingInfo) {
-    switch(missingInfo) {
-        case 'Technicien et Date manquants':
-            return 'bg-red-100 text-red-800 border border-red-300';
-        case 'Technicien manquant':
-            return 'bg-orange-100 text-orange-800 border border-orange-300';
-        case 'Date manquante':
-            return 'bg-yellow-100 text-yellow-800 border border-yellow-300';
-        default:
-            return 'bg-green-100 text-green-800 border border-green-300';
-    }
+    const missingClasses = {
+        'Technicien manquant': 'bg-orange-100 text-orange-800 border border-orange-300',
+        'Date manquante': 'bg-yellow-100 text-yellow-800 border border-yellow-300',
+        'Technicien et Date manquants': 'bg-red-100 text-red-800 border border-red-300',
+        'Complet': 'bg-green-100 text-green-800 border border-green-300'
+    };
+    return missingClasses[missingInfo] || 'bg-gray-100 text-gray-800 border border-gray-300';
 }
 
 function getStatusIconHtml(status) {
     const statusIcons = {
-        'Reçue': '📨',
-        'Assignée': '👤',
-        'Planifiée': '📅',
-        'En cours': '⚡',
-        'Terminée': '✅',
-        'Maintenance SCH': '🔧',
-        'Maintenance VIVEST': '🔧',
-        'Maintenance Moselis': '🔧',
-        'Maintenance CDC': '🔧',
-        'Maintenance CDC Habitat': '🔧'
+        'Reçue': '<i class="fas fa-inbox mr-1"></i>',
+        'Assignée': '<i class="fas fa-user-check mr-1"></i>',
+        'Planifiée': '<i class="fas fa-calendar-check mr-1"></i>',
+        'En cours': '<i class="fas fa-cogs mr-1"></i>',
+        'Terminée': '<i class="fas fa-check-circle mr-1"></i>',
+        'Facturée': '<i class="fas fa-file-invoice mr-1"></i>',
+        'Payée': '<i class="fas fa-credit-card mr-1"></i>',
+        'Pausée': '<i class="fas fa-pause-circle mr-1"></i>',
+        'Annulée': '<i class="fas fa-times-circle mr-1"></i>'
     };
-    return statusIcons[status] || '📋';
-}
-
-function getMissingIcon(missingInfo) {
-    switch(missingInfo) {
-        case 'Technicien et Date manquants':
-            return '🚨';
-        case 'Technicien manquant':
-            return '👤❌';
-        case 'Date manquante':
-            return '📅❌';
-        default:
-            return '✅';
-    }
+    return statusIcons[status] || '<i class="fas fa-circle mr-1"></i>';
 }
 
 function getTimeIcon(hours) {
-    if (hours <= 0) return '⏰💥';
-    if (hours <= 6) return '🚨';
-    if (hours <= 12) return '⚠️';
-    if (hours <= 24) return '⚡';
-    return '✅';
+    if (hours <= 0) return '<i class="fas fa-exclamation-triangle mr-1"></i>';
+    if (hours <= 6) return '<i class="fas fa-clock mr-1"></i>';
+    if (hours <= 12) return '<i class="fas fa-hourglass-half mr-1"></i>';
+    if (hours <= 24) return '<i class="fas fa-hourglass-start mr-1"></i>';
+    return '<i class="fas fa-check mr-1"></i>';
+}
+
+function getMissingIcon(missingInfo) {
+    const missingIcons = {
+        'Technicien manquant': '<i class="fas fa-user-times mr-1"></i>',
+        'Date manquante': '<i class="fas fa-calendar-times mr-1"></i>',
+        'Technicien et Date manquants': '<i class="fas fa-exclamation-triangle mr-1"></i>',
+        'Complet': '<i class="fas fa-check-circle mr-1"></i>'
+    };
+    return missingIcons[missingInfo] || '<i class="fas fa-question-circle mr-1"></i>';
 }
 
 function formatTimeRemaining(hours) {
-    if (hours <= 0) return 'EXPIRÉ';
-    if (hours < 1) return `${Math.round(hours * 60)}min`;
-    return `${Math.round(hours)}h`;
+    if (hours === null || hours === undefined) return 'N/A';
+    if (hours <= 0) return 'Expiré';
+    if (hours < 1) return `${Math.round(hours * 60)} min`;
+    if (hours < 24) return `${Math.round(hours)}h`;
+    return `${Math.round(hours / 24)}j`;
 }

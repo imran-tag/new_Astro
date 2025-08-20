@@ -22,7 +22,8 @@ const baseInterventionFields = `
         WHEN i.technician_uid = 0 OR i.technician_uid IS NULL THEN 'Technicien manquant'
         WHEN i.date_time IS NULL OR i.date_time = '' THEN 'Date manquante'
         ELSE 'Complet'
-    END as missing_info
+    END as missing_info,
+    i.timestamp as created_at
 `;
 
 const baseInterventionJoins = `
@@ -55,8 +56,7 @@ function buildInterventionQuery(type, status = null) {
                       CASE WHEN WEEKDAY(DATE_ADD(i.timestamp, INTERVAL FLOOR(TIMESTAMPDIFF(HOUR, i.timestamp, NOW()) / 24) DAY)) IN (5, 6) THEN 24 ELSE 0 END)
                     )
                 )
-        END as hours_remaining,
-        i.timestamp as created_at`;
+        END as hours_remaining`;
     }
     
     query += baseInterventionJoins;
@@ -152,8 +152,7 @@ function buildUrgentAllQuery(filters) {
                   CASE WHEN WEEKDAY(DATE_ADD(i.timestamp, INTERVAL FLOOR(TIMESTAMPDIFF(HOUR, i.timestamp, NOW()) / 24) DAY)) IN (5, 6) THEN 24 ELSE 0 END)
                 )
             )
-    END as hours_remaining,
-    i.timestamp as created_at`;
+    END as hours_remaining`;
 
     baseQuery += baseInterventionJoins;
     
@@ -289,4 +288,136 @@ function buildUrgentAllQuery(filters) {
     return { query, countQuery };
 }
 
-module.exports = { buildInterventionQuery, buildUrgentAllQuery };
+// NEW: Build query for all recent interventions with filters
+function buildAllRecentQuery(filters) {
+    const {
+        search = '',
+        status = '',
+        priority = '',
+        technician = '',
+        date = '',
+        sortBy = 'date_time',
+        sortOrder = 'desc',
+        limit = 25,
+        offset = 0
+    } = filters;
+
+    let baseQuery = `SELECT ${baseInterventionFields}`;
+    baseQuery += baseInterventionJoins;
+    
+    let whereConditions = ['i.uid != 0'];
+
+    // Search filter
+    if (search && search.trim() !== '') {
+        const searchTerm = search.trim();
+        whereConditions.push(`(
+            i.number LIKE '%${searchTerm}%' OR 
+            i.title LIKE '%${searchTerm}%' OR 
+            i.address LIKE '%${searchTerm}%' OR 
+            i.city LIKE '%${searchTerm}%' OR
+            i.description LIKE '%${searchTerm}%' OR
+            CONCAT(tech.firstname, ' ', tech.lastname) LIKE '%${searchTerm}%'
+        )`);
+    }
+
+    // Status filter
+    if (status && status !== '') {
+        const statusCondition = getStatusCondition(status);
+        if (statusCondition) {
+            whereConditions.push(statusCondition);
+        }
+    }
+
+    // Priority filter
+    if (priority && priority !== '') {
+        switch(priority) {
+            case 'normale':
+                whereConditions.push("(i.priority = 'Normale' OR i.priority = 'normale')");
+                break;
+            case 'importante':
+                whereConditions.push("(i.priority = 'Importante' OR i.priority = 'importante')");
+                break;
+            case 'urgente':
+                whereConditions.push("(i.priority = 'Urgente' OR i.priority = 'urgente')");
+                break;
+        }
+    }
+
+    // Technician filter
+    if (technician && technician !== '') {
+        if (technician === 'unassigned') {
+            whereConditions.push("(i.technician_uid = 0 OR i.technician_uid IS NULL)");
+        } else {
+            whereConditions.push(`i.technician_uid = ${parseInt(technician)}`);
+        }
+    }
+
+    // Date filter
+    if (date && date !== '') {
+        console.log('Date filter - Raw input:', date);
+        
+        // Convert YYYY-MM-DD to DD/MM/YYYY format (as stored in database)
+        const dateObj = new Date(date + 'T00:00:00'); // Add time to avoid timezone issues
+        const day = dateObj.getDate().toString().padStart(2, '0');
+        const month = (dateObj.getMonth() + 1).toString().padStart(2, '0');
+        const year = dateObj.getFullYear();
+        const formattedDate = `${day}/${month}/${year}`;
+        
+        console.log('Date filter - Input:', date, 'Formatted:', formattedDate);
+        whereConditions.push(`i.date_time LIKE '${formattedDate}%'`);
+    }
+
+    const whereClause = whereConditions.length > 1 ? ' WHERE ' + whereConditions.join(' AND ') : ' WHERE ' + whereConditions[0];
+    
+    // Build count query
+    const countQuery = `SELECT COUNT(*) as total_count FROM interventions i
+        LEFT JOIN tenants t ON i.tenant_uid = t.uid
+        LEFT JOIN interventions_status ist ON i.status_uid = ist.uid
+        LEFT JOIN technicians tech ON i.technician_uid = tech.uid
+        ${whereClause}`;
+
+    // Build main query with sorting and pagination
+    let orderBy = '';
+    const validSortFields = ['intervention_id', 'title', 'status', 'priority', 'date_time', 'created_at', 'assigned_to'];
+    if (validSortFields.includes(sortBy)) {
+        let sortField;
+        switch(sortBy) {
+            case 'intervention_id':
+                sortField = 'i.number';
+                break;
+            case 'status':
+                sortField = 'ist.name';
+                break;
+            case 'priority':
+                sortField = 'i.priority';
+                break;
+            case 'date_time':
+                sortField = 'STR_TO_DATE(i.date_time, "%d/%m/%Y")';
+                break;
+            case 'created_at':
+                sortField = 'i.timestamp';
+                break;
+            case 'assigned_to':
+                sortField = 'CONCAT(tech.firstname, " ", tech.lastname)';
+                break;
+            case 'title':
+                sortField = 'i.title';
+                break;
+            default:
+                sortField = 'i.timestamp';
+        }
+        orderBy = ` ORDER BY ${sortField} ${sortOrder.toUpperCase()}, i.uid DESC`;
+    } else {
+        orderBy = ` ORDER BY i.timestamp DESC, i.uid DESC`;
+    }
+
+    const query = baseQuery + whereClause + orderBy + ` LIMIT ${limit} OFFSET ${offset}`;
+
+    // Debug: Log the generated SQL
+    console.log('Generated SQL query:', query);
+    console.log('Count query:', countQuery);
+
+    return { query, countQuery };
+}
+
+module.exports = { buildInterventionQuery, buildUrgentAllQuery, buildAllRecentQuery };
