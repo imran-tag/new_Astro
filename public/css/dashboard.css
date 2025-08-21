@@ -1,0 +1,281 @@
+/* public/css/dashboard.css - Enhanced styles with tooltips and animations */
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+.brand-gradient {
+    background: linear-gradient(135deg, #2563eb, #7c3aed);
+}
+
+.stat-card {
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.stat-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 25px -3px rgba(0, 0, 0, 0.1);
+}
+
+.btn-primary {
+    background-color: #2563eb;
+    color: white;
+    font-weight: 500;
+    padding: 0.5rem 1rem;
+    border-radius: 0.5rem;
+    transition: all 0.2s ease;
+    border: none;
+    cursor: pointer;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.btn-primary:hover {
+    background-color: #1d4ed8;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+}
+
+.btn-secondary {
+    background-color: #dc2626;
+    color: white;
+    font-weight: 500;
+    padding: 0.5rem 1rem;
+    border-radius: 0.5rem;
+    transition: all 0.2s ease;
+    border: none;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.btn-secondary:hover {
+    background-color: #b91c1c;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(220, 38, 38, 0.3);
+}
+
+/* Enhanced urgent row styling */
+.urgent-row {
+    border-left: 4px solid #dc2626;
+    background: linear-gradient(90deg, #fef2f2 0%, #ffffff 100%);
+    animation: pulseGlow 2s infinite;
+}
+
+@keyframes pulseGlow {
+    0%, 100% { background: linear-gradient(90deg, #fef2f2 0%, #ffffff 100%); }
+    50% { background: linear-gradient(90deg, #fee2e2 0%, #ffffff 100%); }
+}
+
+/* Table enhancements */
+.table-hover tr:hover {
+    background-color: #f9fafb;
+    transition: background-color 0.2s ease;
+}
+
+/* Enhanced tooltip styling */
+.tooltip {
+    position: absolute;
+    z-index: 50;
+    visibility: hidden;
+    opacity: 0;
+    background-color: #1f2937;
+    color: white;
+    padding: 0.75rem;
+    border-radius: 0.5rem;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+    max-width: 24rem;
+    white-space: normal;
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    margin-bottom: 0.5rem;
+    transition: all 0.2s ease;
+    pointer-events: none;
+}
+
+.tooltip::after {
+    content: '';
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    margin-left: -5px;
+    border-width: 5px;
+    border-style: solid;
+    border-color: #1f2937 transparent transparent transparent;
+}
+
+.group:hover .tooltip {
+    visibility: visible;
+    opacity: 1;
+    transform: translateX(-50%) translateY(-5px);
+}
+
+/* Status badge enhancements */
+.inline-flex {
+    transition: all 0.2s ease;
+}
+
+.inline-flex:hover {
+    transform: scale(1.05);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+/* Color-coded stat cards */
+.stat-card .bg-white {
+    transition: all 0.3s ease;
+}
+
+.stat-card:hover .border-yellow-200 { border-color: #f59e0b; }
+.stat-card:hover .border-blue-200 { border-color: #3b82f6; }
+.stat-card:hover .border-purple-200 { border-color: #8b5cf6; }
+.stat-card:hover .border-green-200 { border-color: #10b981; }
+.stat-card:hover .border-gray-200 { border-color: #6b7280; }
+.stat-card:hover .border-emerald-200 { border-color: #059669; }
+
+/* Loading states */
+.loading-text {
+    color: #6b7280;
+    font-style: italic;
+    animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+
+/* Error and success states */
+.error-text {
+    color: #dc2626;
+    font-weight: 500;
+}
+
+.success-text {
+    color: #059669;
+    font-weight: 500;
+}
+
+/* Table scroll enhancements */
+.overflow-x-auto {
+    scrollbar-width: thin;
+    scrollbar-color: #cbd5e1 #f1f5f9;
+}
+
+.overflow-x-auto::-webkit-scrollbar {
+    height: 8px;
+}
+
+.overflow-x-auto::-webkit-scrollbar-track {
+    background: #f1f5f9;
+    border-radius: 4px;
+}
+
+.overflow-x-auto::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 4px;
+    transition: background 0.2s ease;
+}
+
+.overflow-x-auto::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+}
+
+/* Filtered section animation */
+#filtered-section {
+    transition: all 0.3s ease;
+    opacity: 0;
+    transform: translateY(-10px);
+}
+
+#filtered-section:not(.hidden) {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+/* Priority indicators */
+.bg-red-200 { animation: urgentPulse 1.5s infinite; }
+
+@keyframes urgentPulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+}
+
+/* Enhanced card shadows */
+.shadow {
+    box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+    transition: box-shadow 0.3s ease;
+}
+
+.shadow:hover {
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+}
+
+/* Icon animations */
+.fa {
+    transition: all 0.2s ease;
+}
+
+.inline-flex:hover .fa {
+    transform: scale(1.1);
+}
+
+/* Responsive improvements */
+@media (max-width: 768px) {
+    .stat-card {
+        padding: 0.75rem;
+    }
+    
+    .tooltip {
+        max-width: 16rem;
+        font-size: 0.8rem;
+    }
+    
+    .btn-primary, .btn-secondary {
+        padding: 0.375rem 0.75rem;
+        font-size: 0.875rem;
+    }
+    
+    .px-6 {
+        padding-left: 1rem;
+        padding-right: 1rem;
+    }
+}
+
+/* Animation for smooth transitions */
+.fade-in {
+    animation: fadeIn 0.5s ease-in;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* Time remaining critical indicators */
+.bg-red-100.border-red-300 {
+    position: relative;
+    overflow: hidden;
+}
+
+.bg-red-100.border-red-300::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
+    animation: shimmer 2s infinite;
+}
+
+@keyframes shimmer {
+    0% { left: -100%; }
+    100% { left: 100%; }
+}
