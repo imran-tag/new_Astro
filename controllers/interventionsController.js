@@ -1681,16 +1681,238 @@ exports.getBusinesses = async (req, res) => {
     }
 };
 
-// UPDATED: Get clients - COMPLETELY FIXED to avoid undefined
-exports.getClients = async (req, res) => {
+// Add this function to your controllers/interventionsController.js
+
+// CREATE: Create new intervention
+exports.createIntervention = async (req, res) => {
     try {
-        const { business_id } = req.query;
-        console.log('Getting clients for business_id:', business_id);
+        console.log('Creating new intervention...');
+        console.log('Request body:', req.body);
         
         const connection = await pool.getConnection();
         
         try {
-            let query = `
+            // Extract form data
+            const {
+                numero,
+                titre,
+                statut,
+                type,
+                priorite,
+                affaire,
+                client,
+                technicien,
+                adresse,
+                ville,
+                immeuble,
+                etage,
+                appartement,
+                date,
+                heure_debut,
+                heure_fin,
+                description,
+                has_pdf,
+                pdf_name
+            } = req.body;
+            
+            // Validate required fields
+            const requiredFields = {
+                numero: numero,
+                titre: titre,
+                statut: statut,
+                type: type,
+                priorite: priorite,
+                affaire: affaire,
+                client: client,
+                technicien: technicien,
+                adresse: adresse,
+                ville: ville,
+                date: date,
+                description: description
+            };
+            
+            console.log('Received fields:', requiredFields);
+            
+            const missingFields = [];
+            for (const [field, value] of Object.entries(requiredFields)) {
+                if (!value || value.toString().trim() === '') {
+                    missingFields.push(field);
+                }
+            }
+            
+            if (missingFields.length > 0) {
+                console.log('Missing fields:', missingFields);
+                return res.status(400).json({
+                    success: false,
+                    message: `Champs manquants: ${missingFields.join(', ')}`
+                });
+            }
+            
+            // Generate public number for intervention
+            const publicNumber = generatePublicNumber();
+            
+            // Prepare datetime field (format for database)
+            let dateTime = date;
+            if (heure_debut) {
+                dateTime = `${date} ${heure_debut}:00`;
+            }
+            
+            // Calculate duration if both start and end times are provided
+            let duration = null;
+            if (heure_debut && heure_fin) {
+                try {
+                    const startTime = new Date(`2000-01-01 ${heure_debut}:00`);
+                    const endTime = new Date(`2000-01-01 ${heure_fin}:00`);
+                    const diffMs = endTime - startTime;
+                    
+                    if (diffMs > 0) {
+                        // Convert to hours (decimal format)
+                        duration = Math.round((diffMs / (1000 * 60 * 60)) * 100) / 100;
+                    } else {
+                        duration = 0; // Default if end time is before start time
+                    }
+                } catch (e) {
+                    duration = 0; // Default on calculation error
+                }
+            } else {
+                duration = 0; // Default duration when times are not provided
+            }
+            
+            console.log('Calculated duration:', duration);
+            
+            // Insert intervention into database
+            const insertQuery = `
+                INSERT INTO interventions (
+                    public_number, agency_uid, business_uid, client_uid, tenant_uid, 
+                    tenant_name, technician_uid, referent_uid, number, status_uid, 
+                    title, date_time, due_date, time_from, time_to, address, city, 
+                    building, floor, appartment, duration, priority, type_uid, description
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            `;
+            
+            const insertValues = [
+                publicNumber,                    // public_number
+                1,                              // agency_uid (default to 1)
+                parseInt(affaire) || 0,         // business_uid
+                parseInt(client) || 0,          // client_uid
+                0,                              // tenant_uid (default to 0)
+                '',                             // tenant_name (empty for now)
+                parseInt(technicien) || 0,      // technician_uid
+                0,                              // referent_uid (default to 0)
+                numero,                         // number
+                parseInt(statut) || 1,          // status_uid
+                titre,                          // title
+                dateTime,                       // date_time
+                date,                           // due_date (same as date for now)
+                heure_debut || null,            // time_from
+                heure_fin || null,              // time_to
+                adresse,                        // address
+                ville,                          // city
+                immeuble || null,               // building
+                etage || null,                  // floor
+                appartement || null,            // appartment
+                duration,                       // duration (calculated or 0)
+                priorite,                       // priority
+                parseInt(type) || 1,            // type_uid
+                description                     // description
+            ];
+            
+            console.log('Insert query:', insertQuery);
+            console.log('Insert values:', insertValues);
+            
+            const [result] = await connection.execute(insertQuery, insertValues);
+            const interventionId = result.insertId;
+            
+            console.log('Intervention created with ID:', interventionId);
+            
+            // Log PDF info if present
+            if (has_pdf && pdf_name) {
+                console.log('PDF noted:', pdf_name);
+                // TODO: Implement file handling later if needed
+            }
+            
+            // Return success response
+            res.json({
+                success: true,
+                message: 'Intervention créée avec succès',
+                data: {
+                    id: interventionId,
+                    public_number: publicNumber,
+                    number: numero,
+                    title: titre,
+                    pdf_noted: has_pdf || false
+                }
+            });
+            
+        } finally {
+            connection.release();
+        }
+        
+    } catch (error) {
+        console.error('Error creating intervention:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Erreur lors de la création de l\'intervention',
+            error: error.message
+        });
+    }
+};
+
+// Helper function to generate intervention number
+exports.getInterventionNumber = async (req, res) => {
+    try {
+        const connection = await pool.getConnection();
+        
+        try {
+            // Get the next intervention number
+            const query = `SELECT MAX(CAST(number AS UNSIGNED)) as max_number FROM interventions`;
+            const [result] = await connection.execute(query);
+            
+            let nextNumber = 1;
+            if (result[0] && result[0].max_number) {
+                nextNumber = parseInt(result[0].max_number) + 1;
+            }
+            
+            // Format number with leading zeros (e.g., 00001)
+            const formattedNumber = nextNumber.toString().padStart(5, '0');
+            
+            res.json({
+                number: formattedNumber,
+                raw_number: nextNumber
+            });
+            
+        } finally {
+            connection.release();
+        }
+        
+    } catch (error) {
+        console.error('Error getting intervention number:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Erreur lors de la génération du numéro',
+            number: '00001' // fallback
+        });
+    }
+};
+
+// Helper function to generate public number (UUID-like)
+function generatePublicNumber() {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    let result = '';
+    for (let i = 0; i < 12; i++) {
+        result += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return result;
+}
+
+// UPDATED: Get clients - COMPLETELY FIXED to avoid undefined
+// FIXED: Get clients - corrected relationship logic
+exports.getClients = async (req, res) => {
+    try {
+        const connection = await pool.getConnection();
+        
+        try {
+            const query = `
                 SELECT uid, name 
                 FROM clients 
                 WHERE uid > 0 
@@ -1698,20 +1920,12 @@ exports.getClients = async (req, res) => {
                   AND name != '' 
                   AND name != 'undefined'
                   AND TRIM(name) != ''
+                ORDER BY name
             `;
             
-            const params = [];
+            console.log('Client query:', query);
             
-            if (business_id && business_id !== '0' && business_id !== '') {
-                query += ` AND business_uid = ?`;
-                params.push(business_id);
-            }
-            
-            query += ` ORDER BY name`;
-            
-            console.log('Client query:', query, 'Params:', params);
-            
-            const [clients] = await connection.execute(query, params);
+            const [clients] = await connection.execute(query);
             
             console.log('Raw clients from DB:', clients);
             
@@ -1722,10 +1936,6 @@ exports.getClients = async (req, res) => {
                                client.name !== 'undefined' &&
                                client.name !== 'null' &&
                                client.uid > 0;
-                
-                if (!isValid) {
-                    console.log('Filtering out invalid client:', client);
-                }
                 
                 return isValid;
             });
@@ -1739,7 +1949,11 @@ exports.getClients = async (req, res) => {
         
     } catch (error) {
         console.error('Error fetching clients:', error);
-        res.status(500).json([]);
+        res.status(500).json({
+            success: false,
+            error: error.message,
+            clients: []
+        });
     }
 };
 // Add this debug endpoint to interventionsController.js 

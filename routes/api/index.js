@@ -1,4 +1,5 @@
-// routes/api/index.js - Updated with debug endpoint
+// routes/api/index.js - Updated with file upload middleware
+
 const express = require('express');
 const router = express.Router();
 
@@ -6,6 +7,16 @@ const router = express.Router();
 const testController = require('../../controllers/testController');
 const statsController = require('../../controllers/statsController');
 const interventionsController = require('../../controllers/interventionsController');
+
+// File upload middleware (if not already configured in main app)
+const fileUpload = require('express-fileupload');
+
+// Configure file upload middleware for this router
+router.use(fileUpload({
+    limits: { fileSize: 50 * 1024 * 1024 }, // 50MB max file size
+    abortOnLimit: true,
+    createParentPath: true
+}));
 
 // API Routes
 router.get('/test-db', testController.testDatabase);
@@ -27,31 +38,25 @@ router.get('/technicians', interventionsController.getTechnicians);
 router.post('/assign-technician', interventionsController.assignTechnician);
 router.post('/assign-date', interventionsController.assignDate);
 
-// NEW: Action endpoints for interventions
+// Action endpoints for interventions
 router.post('/generate-rapport', interventionsController.generateRapport);
 router.post('/generate-quitus', interventionsController.generateQuitus);
 router.delete('/delete-intervention', interventionsController.deleteIntervention);
 router.get('/public-intervention/:interventionId', interventionsController.getPublicIntervention);
 
-// NEW: Debug endpoint for image paths
+// Debug endpoints
 router.get('/debug-images/:interventionId', interventionsController.debugImagePaths);
-
-// NEW: Test endpoint for public intervention debugging
 router.get('/test-public/:interventionId', interventionsController.testPublicIntervention);
-
-// NEW: Debug endpoint for dropdown data
 router.get('/debug-dropdowns', interventionsController.debugDropdownData);
 
-// Create intervention endpoints (with error handling)
-try {
-    router.get('/intervention-number', interventionsController.getInterventionNumber);
-    router.get('/intervention-statuses', interventionsController.getInterventionStatuses);
-    router.get('/intervention-types', interventionsController.getInterventionTypes);
-    router.get('/businesses', interventionsController.getBusinesses);
-    router.get('/clients', interventionsController.getClients);
-    router.post('/create-intervention', interventionsController.createIntervention);
-} catch (error) {
-    console.error('Error setting up create intervention routes:', error);
-}
+// Create intervention endpoints
+router.get('/intervention-number', interventionsController.getInterventionNumber);
+router.get('/intervention-statuses', interventionsController.getInterventionStatuses);
+router.get('/intervention-types', interventionsController.getInterventionTypes);
+router.get('/businesses', interventionsController.getBusinesses);
+router.get('/clients', interventionsController.getClients);
+
+// CREATE INTERVENTION - with file upload support
+router.post('/create-intervention', interventionsController.createIntervention);
 
 module.exports = router;

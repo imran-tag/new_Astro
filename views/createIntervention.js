@@ -1,4 +1,4 @@
-// views/createIntervention.js - Create intervention page with PDF upload
+// views/createIntervention.js - Completely rewritten create intervention page
 
 function getCreateInterventionHTML() {
     return `<!DOCTYPE html>
@@ -13,6 +13,11 @@ function getCreateInterventionHTML() {
         .upload-area {
             border: 2px dashed #d1d5db;
             transition: all 0.3s ease;
+            cursor: pointer;
+        }
+        .upload-area:hover {
+            border-color: #3b82f6;
+            background-color: #f8fafc;
         }
         .upload-area.dragover {
             border-color: #3b82f6;
@@ -27,6 +32,7 @@ function getCreateInterventionHTML() {
         .step-indicator {
             background: #e5e7eb;
             color: #6b7280;
+            transition: all 0.3s ease;
         }
         .step-indicator.active {
             background: #3b82f6;
@@ -62,24 +68,24 @@ function getCreateInterventionHTML() {
         <div class="mb-8">
             <div class="flex items-center justify-center space-x-4">
                 <div class="flex items-center">
-                    <div id="step-1" class="step-indicator active w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium">1</div>
+                    <div id="step-1-indicator" class="step-indicator active w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium">1</div>
                     <span class="ml-2 text-sm font-medium text-gray-600">PDF Upload</span>
                 </div>
                 <div class="w-12 h-px bg-gray-300"></div>
                 <div class="flex items-center">
-                    <div id="step-2" class="step-indicator w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium">2</div>
+                    <div id="step-2-indicator" class="step-indicator w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium">2</div>
                     <span class="ml-2 text-sm font-medium text-gray-600">Détails</span>
                 </div>
                 <div class="w-12 h-px bg-gray-300"></div>
                 <div class="flex items-center">
-                    <div id="step-3" class="step-indicator w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium">3</div>
+                    <div id="step-3-indicator" class="step-indicator w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium">3</div>
                     <span class="ml-2 text-sm font-medium text-gray-600">Validation</span>
                 </div>
             </div>
         </div>
 
         <!-- Step 1: PDF Upload -->
-        <div id="section-1" class="form-section active">
+        <div id="step-1" class="form-section active">
             <div class="bg-white rounded-lg shadow border border-gray-200 p-6">
                 <h2 class="text-xl font-semibold text-gray-900 mb-4">
                     <i class="fas fa-file-pdf mr-2 text-red-500"></i>
@@ -89,28 +95,25 @@ function getCreateInterventionHTML() {
                     Uploadez le PDF du bon de commande pour pré-remplir automatiquement le formulaire, ou passez directement à l'étape suivante pour saisir manuellement.
                 </p>
                 
-                <div id="upload-area" class="upload-area rounded-lg p-8 text-center mb-6">
+                <!-- Upload Area -->
+                <div id="upload-area" class="upload-area p-8 text-center rounded-lg mb-6">
                     <div id="upload-content">
-                        <i class="fas fa-cloud-upload-alt text-6xl text-gray-400 mb-4"></i>
-                        <h3 class="text-lg font-medium text-gray-900 mb-2">Glissez-déposez votre PDF ici</h3>
-                        <p class="text-gray-500 mb-4">ou cliquez pour sélectionner un fichier</p>
-                        <input type="file" id="pdf-upload" accept=".pdf" class="hidden">
-                        <button type="button" onclick="document.getElementById('pdf-upload').click()" 
-                                class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors">
-                            Sélectionner un fichier
-                        </button>
+                        <i class="fas fa-cloud-upload-alt text-4xl text-gray-400 mb-4"></i>
+                        <p class="text-lg font-medium text-gray-700 mb-2">Cliquez pour sélectionner un fichier PDF</p>
+                        <p class="text-sm text-gray-500 mb-4">ou glissez-déposez votre fichier ici</p>
+                        <p class="text-xs text-gray-400">Taille maximum: 10MB</p>
                     </div>
-                    <div id="upload-progress" class="hidden">
-                        <i class="fas fa-spinner fa-spin text-4xl text-blue-500 mb-4"></i>
-                        <p class="text-gray-600">Analyse du PDF en cours...</p>
-                        <div class="w-full bg-gray-200 rounded-full h-2 mt-4">
-                            <div id="progress-bar" class="bg-blue-600 h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
-                        </div>
-                    </div>
+                    
                     <div id="upload-success" class="hidden">
-                        <i class="fas fa-check-circle text-4xl text-green-500 mb-4"></i>
-                        <p class="text-gray-600">PDF analysé avec succès ! Formulaire pré-rempli.</p>
+                        <!-- Success content will be inserted here -->
                     </div>
+                </div>
+                
+                <input type="file" id="pdf-file-input" accept=".pdf" class="hidden">
+                
+                <div class="text-center text-sm text-gray-500 mb-6">
+                    <p><i class="fas fa-info-circle mr-1"></i>
+                    L'upload PDF est optionnel et permet de pré-remplir le formulaire automatiquement.</p>
                 </div>
                 
                 <div class="flex justify-between">
@@ -125,7 +128,7 @@ function getCreateInterventionHTML() {
         </div>
 
         <!-- Step 2: Form Details -->
-        <div id="section-2" class="form-section">
+        <div id="step-2" class="form-section">
             <div class="bg-white rounded-lg shadow border border-gray-200 p-6">
                 <h2 class="text-xl font-semibold text-gray-900 mb-6">
                     <i class="fas fa-edit mr-2 text-blue-500"></i>
@@ -133,16 +136,28 @@ function getCreateInterventionHTML() {
                 </h2>
                 
                 <form id="intervention-form" class="space-y-6">
-                    <!-- Row 1: Numéro, Statut, Type -->
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <!-- Row 1: Numéro, Titre -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-2">
                                 Numéro <span class="text-red-500">*</span>
                             </label>
                             <input type="text" id="numero" name="numero" readonly
-                                   class="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50 text-gray-600 cursor-not-allowed"
+                                   class="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50 text-gray-600"
                                    placeholder="Auto-généré">
                         </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">
+                                Titre <span class="text-red-500">*</span>
+                            </label>
+                            <input type="text" id="titre" name="titre" required
+                                   class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                   placeholder="Titre de l'intervention">
+                        </div>
+                    </div>
+
+                    <!-- Row 2: Statut, Type, Priorité -->
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-2">
                                 Statut <span class="text-red-500">*</span>
@@ -150,7 +165,6 @@ function getCreateInterventionHTML() {
                             <select id="statut" name="statut" required
                                     class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
                                 <option value="">Sélectionner un statut</option>
-                                <!-- Options will be loaded dynamically -->
                             </select>
                         </div>
                         <div>
@@ -160,13 +174,8 @@ function getCreateInterventionHTML() {
                             <select id="type" name="type" required
                                     class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
                                 <option value="">Sélectionner un type</option>
-                                <!-- Options will be loaded dynamically -->
                             </select>
                         </div>
-                    </div>
-
-                    <!-- Row 2: Priorité, Affaire, Client -->
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-2">
                                 Priorité <span class="text-red-500">*</span>
@@ -179,6 +188,10 @@ function getCreateInterventionHTML() {
                                 <option value="Urgente">Urgente</option>
                             </select>
                         </div>
+                    </div>
+
+                    <!-- Row 3: Affaire, Client -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-2">
                                 Affaire <span class="text-red-500">*</span>
@@ -186,7 +199,6 @@ function getCreateInterventionHTML() {
                             <select id="affaire" name="affaire" required
                                     class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
                                 <option value="">Sélectionner une affaire</option>
-                                <!-- Options will be loaded dynamically -->
                             </select>
                         </div>
                         <div>
@@ -196,12 +208,11 @@ function getCreateInterventionHTML() {
                             <select id="client" name="client" required
                                     class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
                                 <option value="">Sélectionner un client</option>
-                                <!-- Options will be loaded dynamically -->
                             </select>
                         </div>
                     </div>
 
-                    <!-- Row 3: Adresse, Ville -->
+                    <!-- Row 4: Adresse, Ville -->
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-2">
@@ -221,7 +232,7 @@ function getCreateInterventionHTML() {
                         </div>
                     </div>
 
-                    <!-- Row 4: Immeuble, Etage, Appartement -->
+                    <!-- Row 5: Immeuble, Etage, Appartement -->
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-2">Immeuble</label>
@@ -236,42 +247,29 @@ function getCreateInterventionHTML() {
                                    placeholder="Numéro d'étage">
                         </div>
                         <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-2">Appartement/Locataire</label>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Appartement</label>
                             <input type="text" id="appartement" name="appartement"
                                    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                   placeholder="Apt ou nom locataire">
+                                   placeholder="Numéro d'appartement">
                         </div>
                     </div>
 
-                    <!-- Row 5: Titre -->
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">
-                            Titre <span class="text-red-500">*</span>
-                        </label>
-                        <input type="text" id="titre" name="titre" required
-                               class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                               placeholder="Titre de l'intervention">
-                    </div>
-
-                    <!-- Row 6: Dates et heures -->
-                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                    <!-- Row 6: Date, Heures -->
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
                         <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-2">Date</label>
-                            <input type="date" id="date" name="date"
+                            <label class="block text-sm font-medium text-gray-700 mb-2">
+                                Date <span class="text-red-500">*</span>
+                            </label>
+                            <input type="date" id="date" name="date" required
                                    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
                         </div>
                         <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-2">Date d'échéance</label>
-                            <input type="date" id="date_echeance" name="date_echeance"
-                                   class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-2">De</label>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Heure début</label>
                             <input type="time" id="heure_debut" name="heure_debut"
                                    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
                         </div>
                         <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-2">À</label>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Heure fin</label>
                             <input type="time" id="heure_fin" name="heure_fin"
                                    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
                         </div>
@@ -279,11 +277,12 @@ function getCreateInterventionHTML() {
 
                     <!-- Row 7: Technicien -->
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">Technicien</label>
-                        <select id="technicien" name="technicien"
+                        <label class="block text-sm font-medium text-gray-700 mb-2">
+                            Technicien <span class="text-red-500">*</span>
+                        </label>
+                        <select id="technicien" name="technicien" required
                                 class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
                             <option value="">Sélectionner un technicien</option>
-                            <!-- Options will be loaded dynamically -->
                         </select>
                     </div>
 
@@ -310,7 +309,7 @@ function getCreateInterventionHTML() {
         </div>
 
         <!-- Step 3: Validation -->
-        <div id="section-3" class="form-section">
+        <div id="step-3" class="form-section">
             <div class="bg-white rounded-lg shadow border border-gray-200 p-6">
                 <h2 class="text-xl font-semibold text-gray-900 mb-6">
                     <i class="fas fa-check-circle mr-2 text-green-500"></i>
@@ -318,7 +317,10 @@ function getCreateInterventionHTML() {
                 </h2>
                 
                 <div id="validation-summary" class="bg-gray-50 rounded-lg p-4 mb-6">
-                    <!-- Summary will be generated here -->
+                    <h3 class="font-medium text-gray-900 mb-3">Résumé de l'intervention</h3>
+                    <div id="summary-content">
+                        <!-- Summary will be generated here -->
+                    </div>
                 </div>
                 
                 <div class="flex justify-between">
