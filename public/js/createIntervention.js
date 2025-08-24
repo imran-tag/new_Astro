@@ -1,4 +1,4 @@
-// public/js/createIntervention.js - Completely rewritten and simplified
+// public/js/createIntervention.js - Enhanced with Price field support
 
 console.log('Loading createIntervention.js');
 
@@ -47,6 +47,18 @@ function setupEventListeners() {
     if (affaireSelect) {
         affaireSelect.addEventListener('change', loadClientsForBusiness);
         console.log('Business select listener added');
+    }
+    
+    // Price field formatting
+    const priceInput = document.getElementById('prix');
+    if (priceInput) {
+        priceInput.addEventListener('blur', function() {
+            // Format price on blur (when user leaves the field)
+            if (this.value && !isNaN(this.value)) {
+                this.value = parseFloat(this.value).toFixed(2);
+            }
+        });
+        console.log('Price input listener added');
     }
     
     // Upload area click
@@ -144,102 +156,105 @@ function showStep(step) {
 function updateStepIndicators(step) {
     for (let i = 1; i <= totalSteps; i++) {
         const indicator = document.getElementById(`step-${i}-indicator`);
+        const line = document.getElementById(`line-${i}`);
+        
         if (indicator) {
-            indicator.classList.remove('active', 'completed');
+            indicator.classList.remove('active', 'completed', 'inactive');
             
             if (i === step) {
                 indicator.classList.add('active');
             } else if (i < step) {
                 indicator.classList.add('completed');
+            } else {
+                indicator.classList.add('inactive');
             }
+        }
+        
+        if (line && i < totalSteps) {
+            line.classList.toggle('completed', i < step);
         }
     }
 }
 
 function skipUpload() {
-    console.log('Skipping PDF upload');
+    console.log('Skipping upload step');
     nextStep();
 }
 
 // ============================================
-// PDF UPLOAD
+// PDF UPLOAD HANDLING
 // ============================================
 
 function handlePDFUpload(file) {
     console.log('Handling PDF upload:', file.name);
     
-    // Validate file
-    if (!file.type.includes('pdf') && !file.name.toLowerCase().endsWith('.pdf')) {
-        alert('Veuillez sélectionner un fichier PDF');
+    if (file.type !== 'application/pdf') {
+        alert('Veuillez sélectionner un fichier PDF.');
         return;
     }
     
-    // Check file size (10MB max)
-    if (file.size > 10 * 1024 * 1024) {
-        alert('Le fichier est trop volumineux (maximum 10MB)');
+    if (file.size > 10 * 1024 * 1024) { // 10MB limit
+        alert('Le fichier est trop volumineux. Taille maximum: 10MB.');
         return;
     }
     
-    // Store file
     uploadedPDFFile = file;
     
-    // Update UI
+    // Show success state
     const uploadContent = document.getElementById('upload-content');
     const uploadSuccess = document.getElementById('upload-success');
     
     if (uploadContent && uploadSuccess) {
-        uploadContent.style.display = 'none';
-        uploadSuccess.style.display = 'block';
-        
-        const fileSize = (file.size / 1024 / 1024).toFixed(2);
+        uploadContent.classList.add('hidden');
+        uploadSuccess.classList.remove('hidden');
         uploadSuccess.innerHTML = `
-            <i class="fas fa-check-circle text-green-500 text-4xl mb-4"></i>
-            <p class="text-lg font-medium text-gray-900">PDF téléchargé avec succès</p>
-            <p class="text-sm text-gray-600 mt-2">${file.name}</p>
-            <p class="text-xs text-gray-500">Taille: ${fileSize} MB</p>
-            <button type="button" onclick="resetUpload()" class="mt-4 text-blue-600 hover:text-blue-700 underline">
-                Changer de fichier
-            </button>
+            <div class="text-center">
+                <i class="fas fa-check-circle text-4xl text-green-500 mb-4"></i>
+                <p class="text-lg font-medium text-green-700 mb-2">PDF téléchargé avec succès!</p>
+                <p class="text-sm text-gray-600 mb-4">${file.name}</p>
+                <button type="button" onclick="resetUpload()" class="text-blue-600 hover:text-blue-800 text-sm">
+                    <i class="fas fa-times mr-1"></i>Supprimer
+                </button>
+            </div>
         `;
-        
-        console.log('PDF upload successful');
     }
+    
+    console.log('PDF upload handled successfully');
 }
 
 function resetUpload() {
-    console.log('Resetting upload');
-    
     uploadedPDFFile = null;
     
     const uploadContent = document.getElementById('upload-content');
     const uploadSuccess = document.getElementById('upload-success');
-    const fileInput = document.getElementById('pdf-file-input');
     
     if (uploadContent && uploadSuccess) {
-        uploadContent.style.display = 'block';
-        uploadSuccess.style.display = 'none';
+        uploadContent.classList.remove('hidden');
+        uploadSuccess.classList.add('hidden');
     }
     
+    // Reset file input
+    const fileInput = document.getElementById('pdf-file-input');
     if (fileInput) {
         fileInput.value = '';
     }
+    
+    console.log('Upload reset');
 }
 
 // ============================================
-// API CALLS
+// DATA LOADING FUNCTIONS
 // ============================================
 
 async function loadInterventionNumber() {
     try {
-        console.log('Loading intervention number...');
         const response = await fetch('/nodetest/api/intervention-number');
-        if (response.ok) {
-            const data = await response.json();
-            const numeroInput = document.getElementById('numero');
-            if (numeroInput) {
-                numeroInput.value = data.number;
-                console.log('Intervention number loaded:', data.number);
-            }
+        const data = await response.json();
+        
+        const numeroInput = document.getElementById('numero');
+        if (numeroInput && data.nextNumber) {
+            numeroInput.value = data.nextNumber;
+            console.log('Intervention number loaded:', data.nextNumber);
         }
     } catch (error) {
         console.error('Error loading intervention number:', error);
@@ -248,152 +263,115 @@ async function loadInterventionNumber() {
 
 async function loadInterventionStatuses() {
     try {
-        console.log('Loading statuses...');
         const response = await fetch('/nodetest/api/intervention-statuses');
-        if (response.ok) {
-            const statuses = await response.json();
-            const select = document.getElementById('statut');
-            if (select) {
-                statuses.forEach(status => {
-                    const option = document.createElement('option');
-                    option.value = status.uid;
-                    option.textContent = status.name;
-                    select.appendChild(option);
-                });
-                console.log('Loaded', statuses.length, 'statuses');
-            }
+        const statuses = await response.json();
+        
+        const statutSelect = document.getElementById('statut');
+        if (statutSelect && Array.isArray(statuses)) {
+            statuses.forEach(status => {
+                const option = document.createElement('option');
+                option.value = status.uid;
+                option.textContent = status.name;
+                statutSelect.appendChild(option);
+            });
+            console.log('Intervention statuses loaded:', statuses.length);
         }
     } catch (error) {
-        console.error('Error loading statuses:', error);
+        console.error('Error loading intervention statuses:', error);
     }
 }
 
 async function loadInterventionTypes() {
     try {
-        console.log('Loading types...');
         const response = await fetch('/nodetest/api/intervention-types');
-        if (response.ok) {
-            const types = await response.json();
-            const select = document.getElementById('type');
-            if (select) {
-                types.forEach(type => {
-                    const option = document.createElement('option');
-                    option.value = type.uid;
-                    option.textContent = type.name;
-                    select.appendChild(option);
-                });
-                console.log('Loaded', types.length, 'types');
-            }
+        const types = await response.json();
+        
+        const typeSelect = document.getElementById('type');
+        if (typeSelect && Array.isArray(types)) {
+            types.forEach(type => {
+                const option = document.createElement('option');
+                option.value = type.uid;
+                option.textContent = type.name;
+                typeSelect.appendChild(option);
+            });
+            console.log('Intervention types loaded:', types.length);
         }
     } catch (error) {
-        console.error('Error loading types:', error);
+        console.error('Error loading intervention types:', error);
     }
 }
 
 async function loadBusinesses() {
     try {
-        console.log('Loading businesses...');
         const response = await fetch('/nodetest/api/businesses');
-        if (response.ok) {
-            const businesses = await response.json();
-            const select = document.getElementById('affaire');
-            if (select) {
-                businesses.forEach(business => {
-                    const option = document.createElement('option');
-                    option.value = business.uid;
-                    option.textContent = business.name || business.title;
-                    select.appendChild(option);
-                });
-                console.log('Loaded', businesses.length, 'businesses');
-            }
+        const businesses = await response.json();
+        
+        const affaireSelect = document.getElementById('affaire');
+        if (affaireSelect && Array.isArray(businesses)) {
+            businesses.forEach(business => {
+                const option = document.createElement('option');
+                option.value = business.uid;
+                option.textContent = business.name;
+                affaireSelect.appendChild(option);
+            });
+            console.log('Businesses loaded:', businesses.length);
         }
     } catch (error) {
         console.error('Error loading businesses:', error);
     }
 }
 
+async function loadTechnicians() {
+    try {
+        const response = await fetch('/nodetest/api/technicians');
+        const technicians = await response.json();
+        
+        const technicienSelect = document.getElementById('technicien');
+        if (technicienSelect && Array.isArray(technicians)) {
+            technicians.forEach(tech => {
+                const option = document.createElement('option');
+                option.value = tech.uid;
+                option.textContent = tech.name;
+                technicienSelect.appendChild(option);
+            });
+            console.log('Technicians loaded:', technicians.length);
+        }
+    } catch (error) {
+        console.error('Error loading technicians:', error);
+    }
+}
+
 async function loadClientsForBusiness() {
-    const businessId = document.getElementById('affaire').value;
+    const affaireSelect = document.getElementById('affaire');
     const clientSelect = document.getElementById('client');
     
-    if (!clientSelect) return;
+    if (!affaireSelect || !clientSelect) return;
     
-    // Clear existing options
+    const businessUid = affaireSelect.value;
+    
+    // Clear existing clients
     clientSelect.innerHTML = '<option value="">Sélectionner un client</option>';
     
-    if (!businessId) {
-        console.log('No business selected');
+    if (!businessUid) {
+        console.log('No business selected, cleared clients');
         return;
     }
     
-    console.log('Loading clients for business:', businessId);
-    
     try {
-        const response = await fetch(`/nodetest/api/clients?business_id=${businessId}`);
+        const response = await fetch(`/nodetest/api/clients?business_uid=${businessUid}`);
+        const clients = await response.json();
         
-        if (response.ok) {
-            const clients = await response.json();
-            console.log('Clients loaded:', clients);
-            
-            if (clients.length === 0) {
-                const option = document.createElement('option');
-                option.value = '';
-                option.textContent = 'Aucun client trouvé';
-                option.disabled = true;
-                clientSelect.appendChild(option);
-                return;
-            }
-            
+        if (Array.isArray(clients)) {
             clients.forEach(client => {
                 const option = document.createElement('option');
                 option.value = client.uid;
                 option.textContent = client.name;
                 clientSelect.appendChild(option);
             });
-            
-            // Auto-select if only one client
-            if (clients.length === 1) {
-                clientSelect.value = clients[0].uid;
-            }
-            
-            console.log('Loaded', clients.length, 'clients');
-        } else {
-            console.error('Error loading clients:', response.status);
-            const option = document.createElement('option');
-            option.value = '';
-            option.textContent = 'Erreur de chargement';
-            option.disabled = true;
-            clientSelect.appendChild(option);
+            console.log('Clients loaded for business:', clients.length);
         }
     } catch (error) {
         console.error('Error loading clients:', error);
-        const option = document.createElement('option');
-        option.value = '';
-        option.textContent = 'Erreur de connexion';
-        option.disabled = true;
-        clientSelect.appendChild(option);
-    }
-}
-
-async function loadTechnicians() {
-    try {
-        console.log('Loading technicians...');
-        const response = await fetch('/nodetest/api/technicians');
-        if (response.ok) {
-            const technicians = await response.json();
-            const select = document.getElementById('technicien');
-            if (select) {
-                technicians.forEach(technician => {
-                    const option = document.createElement('option');
-                    option.value = technician.uid || technician.technician_id;
-                    option.textContent = technician.name || `${technician.firstname} ${technician.lastname}`;
-                    select.appendChild(option);
-                });
-                console.log('Loaded', technicians.length, 'technicians');
-            }
-        }
-    } catch (error) {
-        console.error('Error loading technicians:', error);
     }
 }
 
@@ -428,8 +406,17 @@ function validateForm() {
         }
     }
     
+    // Validate price field (if provided, must be valid)
+    const priceInput = document.getElementById('prix');
+    if (priceInput && priceInput.value && priceInput.value.trim() !== '') {
+        const priceValue = parseFloat(priceInput.value);
+        if (isNaN(priceValue) || priceValue < 0) {
+            errors.push('Prix (doit être un nombre positif)');
+        }
+    }
+    
     if (errors.length > 0) {
-        alert('Les champs suivants sont obligatoires:\n' + errors.join('\n'));
+        alert('Les champs suivants sont obligatoires ou invalides:\n' + errors.join('\n'));
         return false;
     }
     
@@ -452,26 +439,45 @@ function generateSummary() {
         { id: 'affaire', label: 'Affaire', getText: true },
         { id: 'client', label: 'Client', getText: true },
         { id: 'technicien', label: 'Technicien', getText: true },
+        { id: 'prix', label: 'Prix', formatter: (value) => value ? `${parseFloat(value).toFixed(2)} €` : 'Non spécifié' },
         { id: 'adresse', label: 'Adresse' },
         { id: 'ville', label: 'Ville' },
+        { id: 'immeuble', label: 'Immeuble' },
+        { id: 'etage', label: 'Étage' },
+        { id: 'appartement', label: 'Appartement' },
         { id: 'date', label: 'Date' },
+        { id: 'heure_debut', label: 'Heure début' },
+        { id: 'heure_fin', label: 'Heure fin' },
         { id: 'description', label: 'Description' }
     ];
     
-    let summaryHTML = '<div class="grid grid-cols-1 md:grid-cols-2 gap-4">';
+    let summaryHTML = '<div class="space-y-3">';
     
     fields.forEach(field => {
         const element = document.getElementById(field.id);
-        if (element && element.value) {
-            let value = field.getText && element.selectedOptions ? 
-                       element.selectedOptions[0]?.text : element.value;
+        if (element) {
+            let value = '';
             
-            summaryHTML += `
-                <div class="flex justify-between py-2 border-b border-gray-200">
-                    <span class="font-medium text-gray-600">${field.label}:</span>
-                    <span class="text-gray-900">${value}</span>
-                </div>
-            `;
+            if (field.getText && element.selectedOptions && element.selectedOptions[0]) {
+                value = element.selectedOptions[0].text;
+            } else {
+                value = element.value || '';
+            }
+            
+            // Apply custom formatter if provided
+            if (field.formatter) {
+                value = field.formatter(value);
+            }
+            
+            // Only show fields with values (except price which we want to show even if empty)
+            if (value || field.id === 'prix') {
+                summaryHTML += `
+                    <div class="flex justify-between py-2 border-b border-gray-200">
+                        <span class="font-medium text-gray-600">${field.label}:</span>
+                        <span class="text-gray-900">${value}</span>
+                    </div>
+                `;
+            }
         }
     });
     
@@ -513,10 +519,10 @@ async function createIntervention() {
         // Collect form data as JSON object
         const formData = {};
         
-        // Add all form fields
+        // Add all form fields (including prix)
         const formFields = [
             'numero', 'titre', 'statut', 'type', 'priorite', 'affaire', 'client',
-            'technicien', 'adresse', 'ville', 'immeuble', 'etage', 'appartement',
+            'technicien', 'prix', 'adresse', 'ville', 'immeuble', 'etage', 'appartement',
             'date', 'heure_debut', 'heure_fin', 'description'
         ];
         
@@ -527,6 +533,13 @@ async function createIntervention() {
                 console.log(`Added ${field}:`, formData[field]);
             }
         });
+        
+        // Convert prix to proper number format
+        if (formData.prix) {
+            formData.prix = parseFloat(formData.prix) || 0;
+        } else {
+            formData.prix = 0;
+        }
         
         // Add PDF file info if uploaded (we'll handle file upload separately for now)
         if (uploadedPDFFile) {

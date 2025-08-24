@@ -403,6 +403,12 @@ function displayInterventions(interventions) {
                         ${escapeHtml(intervention.address || 'Adresse non définie')}
                     </div>
                 </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                        <i class="fas fa-euro-sign mr-1"></i>
+                        ${formatPrice(intervention.price)}
+                    </span>
+                </td>
                 <td class="px-6 py-4 whitespace-nowrap">
                     <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${statusClass}">
                         ${getStatusIcon(intervention.status)} ${escapeHtml(intervention.status || 'N/A')}
@@ -835,6 +841,19 @@ function confirmDelete() {
         console.error('Error deleting intervention:', error);
         showError('Erreur lors de la suppression de l\'intervention');
     });
+}
+
+function formatPrice(price) {
+    if (price === null || price === undefined || price === '') {
+        return 'Non spécifié';
+    }
+    
+    const numPrice = parseFloat(price);
+    if (isNaN(numPrice)) {
+        return 'Non spécifié';
+    }
+    
+    return numPrice.toFixed(2) + ' €';
 }
 
 // ============================================

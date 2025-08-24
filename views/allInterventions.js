@@ -193,6 +193,8 @@ function getAllInterventionsHTML() {
                             <option value="title">Titre</option>
                             <option value="status">Statut</option>
                             <option value="priority">Priorité</option>
+                            <option value="price">Prix</option>
+
                         </select>
                         <select id="sort-order" class="px-3 py-1 border border-gray-300 rounded text-sm">
                             <option value="desc">Décroissant</option>
@@ -216,6 +218,7 @@ function getAllInterventionsHTML() {
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Statut</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Priorité</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date Intervention</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Prix</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Assigné à</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                         </tr>

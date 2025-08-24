@@ -138,7 +138,7 @@ exports.getUrgentAll = async (req, res) => {
     }
 };
 
-// NEW: All recent interventions with pagination and filters  
+
 exports.getAllRecent = async (req, res) => {
     try {
         const {
@@ -146,9 +146,9 @@ exports.getAllRecent = async (req, res) => {
             limit = 25,
             search = '',
             status = '',
-            priority = '',
             technician = '',
-            date = '',
+            priority = '',
+            dateRange = '',
             sortBy = 'date_time',
             sortOrder = 'desc'
         } = req.query;
@@ -158,9 +158,9 @@ exports.getAllRecent = async (req, res) => {
         const { query, countQuery } = buildAllRecentQuery({
             search,
             status,
-            priority,
             technician,
-            date,
+            priority,
+            dateRange,
             sortBy,
             sortOrder,
             limit: parseInt(limit),
@@ -172,25 +172,20 @@ exports.getAllRecent = async (req, res) => {
         try {
             // Get total count
             const [countResult] = await connection.execute(countQuery);
-            const totalCount = countResult[0] && countResult[0].total_count ?
-                countResult[0].total_count : 0;
-
-            // Get results
-            const [results] = await connection.execute(query);
-
-            // Calculate pagination info
+            const totalCount = countResult[0] && countResult[0].total_count ? 
+                parseInt(countResult[0].total_count) : 0;
+            
+            // Get paginated results
+            const [interventions] = await connection.execute(query);
+            
             const totalPages = Math.ceil(totalCount / parseInt(limit));
-            const hasNextPage = parseInt(page) < totalPages;
-            const hasPrevPage = parseInt(page) > 1;
-
+            
             res.json({
-                data: results,
+                interventions,
                 pagination: {
                     currentPage: parseInt(page),
                     totalPages,
                     totalCount,
-                    hasNextPage,
-                    hasPrevPage,
                     limit: parseInt(limit)
                 }
             });
@@ -199,17 +194,13 @@ exports.getAllRecent = async (req, res) => {
         }
         
     } catch (error) {
-        console.error('Error fetching all recent interventions:', error);
-        res.status(500).json({ 
-            error: 'Failed to fetch interventions',
-            message: error.message,
-            data: [],
+        console.error('Recent interventions error:', error);
+        res.status(500).json({
+            interventions: [],
             pagination: {
                 currentPage: 1,
                 totalPages: 0,
                 totalCount: 0,
-                hasNextPage: false,
-                hasPrevPage: false,
                 limit: 25
             }
         });
@@ -1692,7 +1683,7 @@ exports.createIntervention = async (req, res) => {
         const connection = await pool.getConnection();
         
         try {
-            // Extract form data
+            // Extract form data (including prix)
             const {
                 numero,
                 titre,
@@ -1702,6 +1693,7 @@ exports.createIntervention = async (req, res) => {
                 affaire,
                 client,
                 technicien,
+                prix,                // NEW: Price field
                 adresse,
                 ville,
                 immeuble,
@@ -1732,6 +1724,7 @@ exports.createIntervention = async (req, res) => {
             };
             
             console.log('Received fields:', requiredFields);
+            console.log('Received prix:', prix);
             
             const missingFields = [];
             for (const [field, value] of Object.entries(requiredFields)) {
@@ -1747,6 +1740,22 @@ exports.createIntervention = async (req, res) => {
                     message: `Champs manquants: ${missingFields.join(', ')}`
                 });
             }
+            
+            // Process price field
+            let processedPrice = 0;
+            if (prix !== undefined && prix !== null && prix !== '') {
+                const parsedPrice = parseFloat(prix);
+                if (!isNaN(parsedPrice) && parsedPrice >= 0) {
+                    processedPrice = parsedPrice;
+                } else {
+                    return res.status(400).json({
+                        success: false,
+                        message: 'Le prix doit être un nombre positif'
+                    });
+                }
+            }
+            
+            console.log('Processed price:', processedPrice);
             
             // Generate public number for intervention
             const publicNumber = generatePublicNumber();
@@ -1780,14 +1789,14 @@ exports.createIntervention = async (req, res) => {
             
             console.log('Calculated duration:', duration);
             
-            // Insert intervention into database
+            // Insert intervention into database - ENHANCED WITH PRICE
             const insertQuery = `
                 INSERT INTO interventions (
                     public_number, agency_uid, business_uid, client_uid, tenant_uid, 
                     tenant_name, technician_uid, referent_uid, number, status_uid, 
                     title, date_time, due_date, time_from, time_to, address, city, 
-                    building, floor, appartment, duration, priority, type_uid, description
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    building, floor, appartment, duration, priority, type_uid, description, price
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             `;
             
             const insertValues = [
@@ -1814,7 +1823,8 @@ exports.createIntervention = async (req, res) => {
                 duration,                       // duration (calculated or 0)
                 priorite,                       // priority
                 parseInt(type) || 1,            // type_uid
-                description                     // description
+                description,                    // description
+                processedPrice                  // price (NEW: processed price field)
             ];
             
             console.log('Insert query:', insertQuery);
@@ -1825,22 +1835,17 @@ exports.createIntervention = async (req, res) => {
             
             console.log('Intervention created with ID:', interventionId);
             
-            // Log PDF info if present
-            if (has_pdf && pdf_name) {
-                console.log('PDF noted:', pdf_name);
-                // TODO: Implement file handling later if needed
-            }
-            
             // Return success response
             res.json({
                 success: true,
                 message: 'Intervention créée avec succès',
                 data: {
-                    id: interventionId,
-                    public_number: publicNumber,
+                    interventionId: interventionId,
                     number: numero,
+                    publicNumber: publicNumber,
                     title: titre,
-                    pdf_noted: has_pdf || false
+                    price: processedPrice,
+                    createdAt: new Date().toISOString()
                 }
             });
             

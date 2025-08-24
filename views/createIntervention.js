@@ -1,4 +1,4 @@
-// views/createIntervention.js - Completely rewritten create intervention page
+// views/createIntervention.js - Enhanced intervention creation form with Price field
 
 function getCreateInterventionHTML() {
     return `<!DOCTYPE html>
@@ -6,93 +6,147 @@ function getCreateInterventionHTML() {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nouvelle Intervention - Astro-Tech</title>
+    <title>Nouvelle Intervention - Astro</title>
+    
+    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    
     <style>
         .upload-area {
             border: 2px dashed #d1d5db;
             transition: all 0.3s ease;
-            cursor: pointer;
         }
+        
         .upload-area:hover {
-            border-color: #3b82f6;
-            background-color: #f8fafc;
-        }
-        .upload-area.dragover {
             border-color: #3b82f6;
             background-color: #eff6ff;
         }
+        
+        .upload-area.dragover {
+            border-color: #2563eb;
+            background-color: #dbeafe;
+        }
+        
         .form-section {
             display: none;
         }
+        
         .form-section.active {
             display: block;
         }
+        
         .step-indicator {
-            background: #e5e7eb;
+            display: flex;
+            justify-content: center;
+            margin-bottom: 2rem;
+        }
+        
+        .step {
+            display: flex;
+            align-items: center;
+        }
+        
+        .step-number {
+            width: 2rem;
+            height: 2rem;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            margin-right: 0.5rem;
+        }
+        
+        .step-number.active {
+            background-color: #3b82f6;
+            color: white;
+        }
+        
+        .step-number.completed {
+            background-color: #10b981;
+            color: white;
+        }
+        
+        .step-number.inactive {
+            background-color: #e5e7eb;
             color: #6b7280;
-            transition: all 0.3s ease;
         }
-        .step-indicator.active {
-            background: #3b82f6;
-            color: white;
+        
+        .step-line {
+            width: 4rem;
+            height: 2px;
+            background-color: #e5e7eb;
         }
-        .step-indicator.completed {
-            background: #10b981;
-            color: white;
+        
+        .step-line.completed {
+            background-color: #10b981;
         }
     </style>
 </head>
-<body class="bg-gray-50">
-    <!-- Header -->
-    <header class="bg-white shadow-sm border-b border-gray-200">
+<body class="bg-gray-100">
+    <!-- Navigation -->
+    <nav class="bg-white shadow-sm border-b border-gray-200">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="flex justify-between items-center h-16">
+            <div class="flex justify-between h-16">
                 <div class="flex items-center">
-                    <a href="/nodetest" class="flex items-center text-blue-600 hover:text-blue-700 transition-colors mr-6">
-                        <i class="fas fa-arrow-left mr-2"></i>
-                        <span class="font-medium">Retour au Tableau de Bord</span>
+                    <a href="/nodetest" class="flex items-center space-x-2">
+                        <i class="fas fa-rocket text-blue-600 text-xl"></i>
+                        <span class="text-xl font-bold text-gray-900">Astro</span>
                     </a>
-                    <h1 class="text-2xl font-bold text-gray-900 flex items-center">
-                        <span class="w-3 h-3 bg-green-500 rounded-full mr-3"></span>
-                        Nouvelle Intervention
-                    </h1>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <a href="/nodetest" class="text-gray-600 hover:text-blue-600 transition-colors">
+                        <i class="fas fa-home mr-2"></i>Tableau de bord
+                    </a>
+                    <a href="/nodetest/interventions" class="text-gray-600 hover:text-blue-600 transition-colors">
+                        <i class="fas fa-list mr-2"></i>Interventions
+                    </a>
                 </div>
             </div>
         </div>
-    </header>
+    </nav>
 
-    <main class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <main class="max-w-4xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
+        <!-- Page Header -->
+        <div class="text-center mb-8">
+            <h1 class="text-3xl font-bold text-gray-900 mb-2">
+                <i class="fas fa-plus-circle mr-3 text-blue-600"></i>
+                Nouvelle Intervention
+            </h1>
+            <p class="text-gray-600">Créez une nouvelle intervention en suivant les étapes ci-dessous</p>
+        </div>
+
         <!-- Step Indicator -->
-        <div class="mb-8">
-            <div class="flex items-center justify-center space-x-4">
-                <div class="flex items-center">
-                    <div id="step-1-indicator" class="step-indicator active w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium">1</div>
-                    <span class="ml-2 text-sm font-medium text-gray-600">PDF Upload</span>
-                </div>
-                <div class="w-12 h-px bg-gray-300"></div>
-                <div class="flex items-center">
-                    <div id="step-2-indicator" class="step-indicator w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium">2</div>
-                    <span class="ml-2 text-sm font-medium text-gray-600">Détails</span>
-                </div>
-                <div class="w-12 h-px bg-gray-300"></div>
-                <div class="flex items-center">
-                    <div id="step-3-indicator" class="step-indicator w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium">3</div>
-                    <span class="ml-2 text-sm font-medium text-gray-600">Validation</span>
-                </div>
+        <div class="step-indicator mb-8">
+            <div class="step">
+                <div id="step-1-indicator" class="step-number active">1</div>
+                <span class="text-sm text-gray-600">Upload PDF (optionnel)</span>
+            </div>
+            <div class="step-line" id="line-1"></div>
+            <div class="step">
+                <div id="step-2-indicator" class="step-number inactive">2</div>
+                <span class="text-sm text-gray-600">Détails</span>
+            </div>
+            <div class="step-line" id="line-2"></div>
+            <div class="step">
+                <div id="step-3-indicator" class="step-number inactive">3</div>
+                <span class="text-sm text-gray-600">Validation</span>
             </div>
         </div>
 
         <!-- Step 1: PDF Upload -->
         <div id="step-1" class="form-section active">
             <div class="bg-white rounded-lg shadow border border-gray-200 p-6">
-                <h2 class="text-xl font-semibold text-gray-900 mb-4">
+                <h2 class="text-xl font-semibold text-gray-900 mb-6">
                     <i class="fas fa-file-pdf mr-2 text-red-500"></i>
-                    Upload du Bon de Commande (Optionnel)
+                    Upload PDF (Optionnel)
                 </h2>
+                
                 <p class="text-gray-600 mb-6">
-                    Uploadez le PDF du bon de commande pour pré-remplir automatiquement le formulaire, ou passez directement à l'étape suivante pour saisir manuellement.
+                    Téléchargez un PDF pour pré-remplir automatiquement le formulaire d'intervention.
                 </p>
                 
                 <!-- Upload Area -->
@@ -190,8 +244,8 @@ function getCreateInterventionHTML() {
                         </div>
                     </div>
 
-                    <!-- Row 3: Affaire, Client -->
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <!-- Row 3: Affaire, Client, Prix -->
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-2">
                                 Affaire <span class="text-red-500">*</span>
@@ -210,9 +264,30 @@ function getCreateInterventionHTML() {
                                 <option value="">Sélectionner un client</option>
                             </select>
                         </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">
+                                Prix (€)
+                            </label>
+                            <input type="number" id="prix" name="prix" step="0.01" min="0"
+                                   class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                   placeholder="0.00">
+                        </div>
                     </div>
 
-                    <!-- Row 4: Adresse, Ville -->
+                    <!-- Row 4: Technicien -->
+                    <div class="grid grid-cols-1 md:grid-cols-1 gap-6">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">
+                                Technicien <span class="text-red-500">*</span>
+                            </label>
+                            <select id="technicien" name="technicien" required
+                                    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                <option value="">Sélectionner un technicien</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Row 5: Adresse, Ville -->
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-2">
@@ -232,29 +307,35 @@ function getCreateInterventionHTML() {
                         </div>
                     </div>
 
-                    <!-- Row 5: Immeuble, Etage, Appartement -->
+                    <!-- Row 6: Immeuble, Etage, Appartement -->
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
                         <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-2">Immeuble</label>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">
+                                Immeuble
+                            </label>
                             <input type="text" id="immeuble" name="immeuble"
                                    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                                    placeholder="Nom de l'immeuble">
                         </div>
                         <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-2">Étage</label>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">
+                                Étage
+                            </label>
                             <input type="text" id="etage" name="etage"
                                    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                   placeholder="Numéro d'étage">
+                                   placeholder="Étage">
                         </div>
                         <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-2">Appartement</label>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">
+                                Appartement
+                            </label>
                             <input type="text" id="appartement" name="appartement"
                                    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                                    placeholder="Numéro d'appartement">
                         </div>
                     </div>
 
-                    <!-- Row 6: Date, Heures -->
+                    <!-- Row 7: Date, Heure début, Heure fin -->
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-2">
@@ -264,26 +345,19 @@ function getCreateInterventionHTML() {
                                    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
                         </div>
                         <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-2">Heure début</label>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">
+                                Heure de début
+                            </label>
                             <input type="time" id="heure_debut" name="heure_debut"
                                    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
                         </div>
                         <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-2">Heure fin</label>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">
+                                Heure de fin
+                            </label>
                             <input type="time" id="heure_fin" name="heure_fin"
                                    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
                         </div>
-                    </div>
-
-                    <!-- Row 7: Technicien -->
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">
-                            Technicien <span class="text-red-500">*</span>
-                        </label>
-                        <select id="technicien" name="technicien" required
-                                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
-                            <option value="">Sélectionner un technicien</option>
-                        </select>
                     </div>
 
                     <!-- Row 8: Description -->
@@ -291,13 +365,13 @@ function getCreateInterventionHTML() {
                         <label class="block text-sm font-medium text-gray-700 mb-2">
                             Description <span class="text-red-500">*</span>
                         </label>
-                        <textarea id="description" name="description" required rows="4"
+                        <textarea id="description" name="description" rows="4" required
                                   class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                  placeholder="Description détaillée de l'intervention"></textarea>
+                                  placeholder="Décrivez l'intervention..."></textarea>
                     </div>
                 </form>
                 
-                <div class="flex justify-between mt-8">
+                <div class="flex justify-between mt-6">
                     <button type="button" onclick="prevStep()" class="px-6 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors">
                         <i class="fas fa-arrow-left mr-2"></i>Précédent
                     </button>

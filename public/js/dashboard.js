@@ -170,6 +170,12 @@ function displayRecentTable(recent) {
                         ${escapeHtml(intervention.description || 'Aucune description')}
                     </div>
                 </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                        <i class="fas fa-euro-sign mr-1"></i>
+                        ${formatPrice(intervention.price)}
+                    </span>
+                </td>
                 <td class="px-6 py-4 whitespace-nowrap">
                     <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${statusClass}">
                         ${getStatusIconHtml(intervention.status)} ${escapeHtml(intervention.status || 'N/A')}
@@ -287,6 +293,12 @@ function displayFilteredTable(interventions, status) {
                         ${escapeHtml(intervention.description || 'Aucune description')}
                     </div>
                 </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                        <i class="fas fa-euro-sign mr-1"></i>
+                        ${formatPrice(intervention.price)}
+                    </span>
+                </td>
                 <td class="px-6 py-4 whitespace-nowrap">
                     <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${statusClass}">
                         ${getStatusIconHtml(intervention.status)} ${escapeHtml(intervention.status || 'N/A')}
@@ -335,7 +347,18 @@ function clearFilter() {
         filteredSection.classList.add('hidden');
     }
 }
-
+function formatPrice(price) {
+    if (price === null || price === undefined || price === '') {
+        return 'Non spécifié';
+    }
+    
+    const numPrice = parseFloat(price);
+    if (isNaN(numPrice)) {
+        return 'Non spécifié';
+    }
+    
+    return numPrice.toFixed(2) + ' €';
+}
 function loadAllRecent() {
     // Navigate to the all interventions page
     window.location.href = '/nodetest/interventions';
