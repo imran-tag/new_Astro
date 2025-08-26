@@ -13,6 +13,7 @@ const baseInterventionFields = `
     i.priority,
     i.date_time,
     i.technician_uid,
+    i.price,
     CASE 
         WHEN i.technician_uid = 0 OR i.technician_uid IS NULL THEN 'Non assigné'
         ELSE CONCAT(tech.firstname, ' ', tech.lastname)
@@ -41,7 +42,6 @@ function buildInterventionQuery(type, status = null) {
         query += `, 
         CASE 
             WHEN WEEKDAY(i.timestamp) IN (5, 6) THEN 
-                -- If created on weekend, start counting from Monday 9 AM
                 GREATEST(0, 48 - 
                     TIMESTAMPDIFF(HOUR, 
                         DATE_ADD(DATE_ADD(i.timestamp, INTERVAL (7 - WEEKDAY(i.timestamp)) DAY), INTERVAL 9 HOUR),
@@ -49,7 +49,6 @@ function buildInterventionQuery(type, status = null) {
                     )
                 )
             ELSE 
-                -- Normal business days calculation
                 GREATEST(0, 48 - 
                     (TIMESTAMPDIFF(HOUR, i.timestamp, NOW()) - 
                      (FLOOR(TIMESTAMPDIFF(HOUR, i.timestamp, NOW()) / 24) * 
@@ -60,7 +59,9 @@ function buildInterventionQuery(type, status = null) {
     }
     
     query += baseInterventionJoins;
-    query += ` WHERE i.uid != 0`;
+    
+    // FIXED: Add agency filter to base condition
+    query += ` WHERE i.uid != 0 AND i.agency_uid = 1`;
     
     // Add urgent condition - interventions created in last 48h missing technician OR date
     if (type === 'urgent') {
@@ -156,15 +157,17 @@ function buildUrgentAllQuery(filters) {
             GREATEST(0, 48 - 
                 (TIMESTAMPDIFF(HOUR, i.timestamp, NOW()) - 
                  (FLOOR(TIMESTAMPDIFF(HOUR, i.timestamp, NOW()) / 24) * 
-                      CASE WHEN WEEKDAY(DATE_ADD(i.timestamp, INTERVAL FLOOR(TIMESTAMPDIFF(HOUR, i.timestamp, NOW()) / 24) DAY)) IN (5, 6) THEN 24 ELSE 0 END)
-                    )
+                  CASE WHEN WEEKDAY(DATE_ADD(i.timestamp, INTERVAL FLOOR(TIMESTAMPDIFF(HOUR, i.timestamp, NOW()) / 24) DAY)) IN (5, 6) THEN 24 ELSE 0 END)
                 )
-        END as hours_remaining`;
+            )
+    END as hours_remaining`;
     
     baseQuery += baseInterventionJoins;
     
+    // FIXED: Add agency filter to urgent interventions
     let whereConditions = [
         'i.uid != 0',
+        'i.agency_uid = 1',
         `(
             (i.technician_uid = 0 OR i.technician_uid IS NULL OR i.date_time IS NULL OR i.date_time = '')
             AND
@@ -198,19 +201,9 @@ function buildUrgentAllQuery(filters) {
 
     // Status filter
     if (status && status !== '') {
-        switch(status) {
-            case 'planifie':
-                whereConditions.push("(ist.name LIKE '%planifi%')");
-                break;
-            case 'maintenance':
-                whereConditions.push("(ist.name LIKE '%maintenance%')");
-                break;
-            case 'recu':
-                whereConditions.push("(ist.name = 'Reçue')");
-                break;
-            case 'assigne':
-                whereConditions.push("(ist.name = 'Assignée')");
-                break;
+        const statusCondition = getStatusCondition(status);
+        if (statusCondition) {
+            whereConditions.push(statusCondition);
         }
     }
 
@@ -229,58 +222,20 @@ function buildUrgentAllQuery(filters) {
         }
     }
 
-    // Time filter
-    if (timeFilter && timeFilter !== '') {
-        const timeCondition = `CASE 
-            WHEN WEEKDAY(i.timestamp) IN (5, 6) THEN 
-                GREATEST(0, 48 - 
-                    TIMESTAMPDIFF(HOUR, 
-                        DATE_ADD(DATE_ADD(i.timestamp, INTERVAL (7 - WEEKDAY(i.timestamp)) DAY), INTERVAL 9 HOUR),
-                        NOW()
-                    )
-                )
-            ELSE 
-                GREATEST(0, 48 - 
-                    (TIMESTAMPDIFF(HOUR, i.timestamp, NOW()) - 
-                     (FLOOR(TIMESTAMPDIFF(HOUR, i.timestamp, NOW()) / 24) * 
-                      CASE WHEN WEEKDAY(DATE_ADD(i.timestamp, INTERVAL FLOOR(TIMESTAMPDIFF(HOUR, i.timestamp, NOW()) / 24) DAY)) IN (5, 6) THEN 24 ELSE 0 END)
-                    )
-                )
-        END`;
-        
-        switch(timeFilter) {
-            case 'expired':
-                whereConditions.push(`(${timeCondition}) <= 0`);
-                break;
-            case 'critical':
-                whereConditions.push(`(${timeCondition}) > 0 AND (${timeCondition}) <= 6`);
-                break;
-            case 'urgent':
-                whereConditions.push(`(${timeCondition}) > 6 AND (${timeCondition}) <= 12`);
-                break;
-            case 'warning':
-                whereConditions.push(`(${timeCondition}) > 12 AND (${timeCondition}) <= 24`);
-                break;
-            case 'good':
-                whereConditions.push(`(${timeCondition}) > 24 AND (${timeCondition}) <= 48`);
-                break;
-        }
-    }
-
-    const whereClause = ' WHERE ' + whereConditions.join(' AND ');
+    const whereClause = whereConditions.length > 1 ? 
+        ' WHERE ' + whereConditions.join(' AND ') : ' WHERE ' + whereConditions[0];
     
-    // Build count query
+    // Build count query - FIXED: Include agency filter
     const countQuery = `SELECT COUNT(*) as total_count FROM interventions i
         LEFT JOIN tenants t ON i.tenant_uid = t.uid
         LEFT JOIN interventions_status ist ON i.status_uid = ist.uid
         LEFT JOIN technicians tech ON i.technician_uid = tech.uid
         ${whereClause}`;
 
-    // Build main query with sorting and pagination
+    // Build main query with sorting
     let orderBy = '';
-    const validSortFields = ['intervention_id', 'title', 'status', 'hours_remaining', 'created_at'];
-    if (validSortFields.includes(sortBy)) {
-        const sortField = sortBy === 'intervention_id' ? 'i.number' : 
+    if (sortBy && ['intervention_id', 'title', 'status', 'priority', 'hours_remaining', 'created_at', 'assigned_to'].includes(sortBy)) {
+        const sortField = sortBy === 'intervention_id' ? 'CAST(i.number AS UNSIGNED)' : 
                          sortBy === 'hours_remaining' ? 'hours_remaining' :
                          sortBy === 'created_at' ? 'i.timestamp' :
                          sortBy;
@@ -293,7 +248,6 @@ function buildUrgentAllQuery(filters) {
 
     return { query, countQuery };
 }
-
 // NEW: Build query for all recent interventions with filters and DATE RANGE support
 function buildAllRecentQuery(filters) {
     const {
@@ -311,7 +265,8 @@ function buildAllRecentQuery(filters) {
     let baseQuery = `SELECT ${baseInterventionFields}`;
     baseQuery += baseInterventionJoins;
     
-    let whereConditions = ['i.uid != 0'];
+    // FIXED: Add agency filter to base condition
+    let whereConditions = ['i.uid != 0', 'i.agency_uid = 1'];
 
     // Search filter
     if (search && search.trim() !== '') {
@@ -380,9 +335,10 @@ function buildAllRecentQuery(filters) {
         }
     }
 
-    const whereClause = whereConditions.length > 1 ? ' WHERE ' + whereConditions.join(' AND ') : ' WHERE ' + whereConditions[0];
+    const whereClause = whereConditions.length > 1 ? 
+        ' WHERE ' + whereConditions.join(' AND ') : ' WHERE ' + whereConditions[0];
     
-    // Build count query
+    // Build count query - FIXED: Include agency filter
     const countQuery = `SELECT COUNT(*) as total_count FROM interventions i
         LEFT JOIN tenants t ON i.tenant_uid = t.uid
         LEFT JOIN interventions_status ist ON i.status_uid = ist.uid
@@ -396,7 +352,7 @@ function buildAllRecentQuery(filters) {
         let sortField;
         switch(sortBy) {
             case 'intervention_id':
-                sortField = 'i.number';
+                sortField = 'CAST(i.number AS UNSIGNED)';  // Proper numeric sort
                 break;
             case 'status':
                 sortField = 'ist.name';
@@ -405,13 +361,13 @@ function buildAllRecentQuery(filters) {
                 sortField = 'i.priority';
                 break;
             case 'date_time':
-                sortField = 'STR_TO_DATE(i.date_time, "%d/%m/%Y")';
+                sortField = 'STR_TO_DATE(i.date_time, "%d/%m/%Y %H:%i")';
                 break;
             case 'created_at':
                 sortField = 'i.timestamp';
                 break;
             case 'assigned_to':
-                sortField = 'CONCAT(tech.firstname, " ", tech.lastname)';
+                sortField = 'CONCAT(COALESCE(tech.firstname, ""), " ", COALESCE(tech.lastname, ""))';
                 break;
             case 'title':
                 sortField = 'i.title';
@@ -426,9 +382,8 @@ function buildAllRecentQuery(filters) {
 
     const query = baseQuery + whereClause + orderBy + ` LIMIT ${limit} OFFSET ${offset}`;
 
-    // Debug: Log the generated SQL
-    console.log('Generated SQL query:', query);
-    console.log('Count query:', countQuery);
+    console.log('Generated SQL query with agency filter:', query);
+    console.log('Count query with agency filter:', countQuery);
 
     return { query, countQuery };
 }

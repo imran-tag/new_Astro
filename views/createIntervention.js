@@ -123,7 +123,7 @@ function getCreateInterventionHTML() {
         <div class="step-indicator mb-8">
             <div class="step">
                 <div id="step-1-indicator" class="step-number active">1</div>
-                <span class="text-sm text-gray-600">Upload PDF (optionnel)</span>
+                <span class="text-sm text-gray-600">Upload PDF</span>
             </div>
             <div class="step-line" id="line-1"></div>
             <div class="step">
@@ -146,7 +146,7 @@ function getCreateInterventionHTML() {
                 </h2>
                 
                 <p class="text-gray-600 mb-6">
-                    Téléchargez un PDF pour pré-remplir automatiquement le formulaire d'intervention.
+                    Téléchargez le PDF du Bon de commande et remplissez le formulaire d'intervention.
                 </p>
                 
                 <!-- Upload Area -->
@@ -167,7 +167,7 @@ function getCreateInterventionHTML() {
                 
                 <div class="text-center text-sm text-gray-500 mb-6">
                     <p><i class="fas fa-info-circle mr-1"></i>
-                    L'upload PDF est optionnel et permet de pré-remplir le formulaire automatiquement.</p>
+                    L'upload du Bon de commande est optionnel</p>
                 </div>
                 
                 <div class="flex justify-between">
@@ -278,9 +278,9 @@ function getCreateInterventionHTML() {
                     <div class="grid grid-cols-1 md:grid-cols-1 gap-6">
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-2">
-                                Technicien <span class="text-red-500">*</span>
+                                Technicien 
                             </label>
-                            <select id="technicien" name="technicien" required
+                            <select id="technicien" name="technicien" 
                                     class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
                                 <option value="">Sélectionner un technicien</option>
                             </select>
@@ -339,9 +339,9 @@ function getCreateInterventionHTML() {
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-2">
-                                Date <span class="text-red-500">*</span>
+                                Date 
                             </label>
-                            <input type="date" id="date" name="date" required
+                            <input type="date" id="date" name="date" 
                                    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
                         </div>
                         <div>

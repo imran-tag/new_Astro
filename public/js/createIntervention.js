@@ -26,12 +26,12 @@ function initializePage() {
     // Setup event listeners
     setupEventListeners();
     
-    // Set default date to today
-    const dateInput = document.getElementById('date');
-    if (dateInput) {
-        const today = new Date().toISOString().split('T')[0];
-        dateInput.value = today;
-    }
+    // REMOVED: Auto-set today's date
+    // const dateInput = document.getElementById('date');
+    // if (dateInput) {
+    //     const today = new Date().toISOString().split('T')[0];
+    //     dateInput.value = today;
+    // }
     
     // Show first step
     showStep(1);
@@ -248,16 +248,46 @@ function resetUpload() {
 
 async function loadInterventionNumber() {
     try {
+        console.log('Loading intervention number...');
+        
         const response = await fetch('/nodetest/api/intervention-number');
+        
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
         const data = await response.json();
+        console.log('Intervention number API response:', data);
         
         const numeroInput = document.getElementById('numero');
-        if (numeroInput && data.nextNumber) {
-            numeroInput.value = data.nextNumber;
-            console.log('Intervention number loaded:', data.nextNumber);
+        if (numeroInput) {
+            // FIXED: Use data.number instead of data.nextNumber
+            if (data.number) {
+                numeroInput.value = data.number;
+                console.log('Intervention number set to:', data.number);
+            } else if (data.raw_number) {
+                // Fallback: format raw_number if number is missing
+                const formattedNumber = data.raw_number.toString().padStart(5, '0');
+                numeroInput.value = formattedNumber;
+                console.log('Intervention number set to (formatted):', formattedNumber);
+            } else {
+                // Final fallback: generate a basic number
+                numeroInput.value = '00001';
+                console.warn('Using fallback intervention number: 00001');
+            }
+        } else {
+            console.error('Numero input field not found');
         }
+        
     } catch (error) {
         console.error('Error loading intervention number:', error);
+        
+        // Fallback: set a default number if API fails
+        const numeroInput = document.getElementById('numero');
+        if (numeroInput) {
+            numeroInput.value = '00001';
+            console.log('Set fallback intervention number due to error');
+        }
     }
 }
 
@@ -382,6 +412,7 @@ async function loadClientsForBusiness() {
 function validateForm() {
     console.log('Validating form...');
     
+    // UPDATED: Removed 'technicien' and 'date' from required fields
     const requiredFields = [
         { id: 'numero', name: 'Numéro' },
         { id: 'titre', name: 'Titre' },
@@ -390,10 +421,8 @@ function validateForm() {
         { id: 'priorite', name: 'Priorité' },
         { id: 'affaire', name: 'Affaire' },
         { id: 'client', name: 'Client' },
-        { id: 'technicien', name: 'Technicien' },
         { id: 'adresse', name: 'Adresse' },
         { id: 'ville', name: 'Ville' },
-        { id: 'date', name: 'Date' },
         { id: 'description', name: 'Description' }
     ];
     
@@ -401,8 +430,16 @@ function validateForm() {
     
     for (const field of requiredFields) {
         const element = document.getElementById(field.id);
-        if (!element || !element.value || element.value.trim() === '') {
-            errors.push(field.name);
+        
+        // Special handling for numero field
+        if (field.id === 'numero') {
+            if (!element || !element.value || element.value.trim() === '' || element.value === 'Auto-généré') {
+                errors.push(`${field.name} (non généré automatiquement)`);
+            }
+        } else {
+            if (!element || !element.value || element.value.trim() === '') {
+                errors.push(field.name);
+            }
         }
     }
     
@@ -438,16 +475,17 @@ function generateSummary() {
         { id: 'priorite', label: 'Priorité' },
         { id: 'affaire', label: 'Affaire', getText: true },
         { id: 'client', label: 'Client', getText: true },
-        { id: 'technicien', label: 'Technicien', getText: true },
-        { id: 'prix', label: 'Prix', formatter: (value) => value ? `${parseFloat(value).toFixed(2)} €` : 'Non spécifié' },
+        { id: 'technicien', label: 'Technicien', getText: true, optional: true },
+        { id: 'prix', label: 'Prix', formatter: (value) => value ? 
+            `${parseFloat(value).toFixed(2)} €` : 'Non spécifié', optional: true },
         { id: 'adresse', label: 'Adresse' },
         { id: 'ville', label: 'Ville' },
-        { id: 'immeuble', label: 'Immeuble' },
-        { id: 'etage', label: 'Étage' },
-        { id: 'appartement', label: 'Appartement' },
-        { id: 'date', label: 'Date' },
-        { id: 'heure_debut', label: 'Heure début' },
-        { id: 'heure_fin', label: 'Heure fin' },
+        { id: 'immeuble', label: 'Immeuble', optional: true },
+        { id: 'etage', label: 'Étage', optional: true },
+        { id: 'appartement', label: 'Appartement', optional: true },
+        { id: 'date', label: 'Date', optional: true },
+        { id: 'heure_debut', label: 'Heure début', optional: true },
+        { id: 'heure_fin', label: 'Heure fin', optional: true },
         { id: 'description', label: 'Description' }
     ];
     
@@ -469,12 +507,19 @@ function generateSummary() {
                 value = field.formatter(value);
             }
             
-            // Only show fields with values (except price which we want to show even if empty)
-            if (value || field.id === 'prix') {
+            // Show fields with values OR show optional fields as "Non spécifié"
+            if (value && value.trim() !== '') {
                 summaryHTML += `
                     <div class="flex justify-between py-2 border-b border-gray-200">
                         <span class="font-medium text-gray-600">${field.label}:</span>
                         <span class="text-gray-900">${value}</span>
+                    </div>
+                `;
+            } else if (field.optional) {
+                summaryHTML += `
+                    <div class="flex justify-between py-2 border-b border-gray-200">
+                        <span class="font-medium text-gray-600">${field.label}:</span>
+                        <span class="text-gray-500 italic">Non spécifié</span>
                     </div>
                 `;
             }
@@ -501,91 +546,78 @@ function generateSummary() {
 async function createIntervention() {
     console.log('Creating intervention...');
     
+    // Debug form data first
+    
     // Final validation
     if (!validateForm()) {
         return;
     }
     
     const createBtn = document.getElementById('create-btn');
-    const originalText = createBtn ? createBtn.textContent : 'Créer l\'Intervention';
+    const originalText = createBtn ? createBtn.textContent : '';
     
     try {
-        // Show loading state
+        // Update button state
         if (createBtn) {
             createBtn.textContent = 'Création en cours...';
             createBtn.disabled = true;
         }
         
-        // Collect form data as JSON object
-        const formData = {};
+        // Prepare form data - ensure all fields have values (empty string for optional fields)
+        const submitData = {
+            numero: document.getElementById('numero').value || '',
+            titre: document.getElementById('titre').value || '',
+            description: document.getElementById('description').value || '',
+            priorite: document.getElementById('priorite').value || 'normale',
+            statut: document.getElementById('statut').value || '',
+            type: document.getElementById('type').value || '',
+            affaire: document.getElementById('affaire').value || '',
+            client: document.getElementById('client').value || '',
+            technicien: document.getElementById('technicien').value || 0,
+            prix: document.getElementById('prix').value || '',
+            adresse: document.getElementById('adresse').value || '',
+            ville: document.getElementById('ville').value || '',
+            immeuble: document.getElementById('immeuble').value || '',
+            etage: document.getElementById('etage').value || '',
+            appartement: document.getElementById('appartement').value || '',
+            date: document.getElementById('date').value || '',
+            heure_debut: document.getElementById('heure_debut').value || '',
+            heure_fin: document.getElementById('heure_fin').value || ''
+        };
         
-        // Add all form fields (including prix)
-        const formFields = [
-            'numero', 'titre', 'statut', 'type', 'priorite', 'affaire', 'client',
-            'technicien', 'prix', 'adresse', 'ville', 'immeuble', 'etage', 'appartement',
-            'date', 'heure_debut', 'heure_fin', 'description'
-        ];
+        console.log('Submitting data:', submitData);
         
-        formFields.forEach(field => {
-            const element = document.getElementById(field);
-            if (element) {
-                formData[field] = element.value || '';
-                console.log(`Added ${field}:`, formData[field]);
-            }
-        });
-        
-        // Convert prix to proper number format
-        if (formData.prix) {
-            formData.prix = parseFloat(formData.prix) || 0;
-        } else {
-            formData.prix = 0;
-        }
-        
-        // Add PDF file info if uploaded (we'll handle file upload separately for now)
-        if (uploadedPDFFile) {
-            formData.has_pdf = true;
-            formData.pdf_name = uploadedPDFFile.name;
-            console.log('PDF file noted:', uploadedPDFFile.name);
-        } else {
-            formData.has_pdf = false;
-        }
-        
-        console.log('Form data to submit:', formData);
-        
-        // Submit to API as JSON
-        console.log('Submitting to API...');
         const response = await fetch('/nodetest/api/create-intervention', {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json',
+                'Content-Type': 'application/json'
             },
-            body: JSON.stringify(formData)
+            body: JSON.stringify(submitData)
         });
         
+        console.log('API response status:', response.status);
         const result = await response.json();
         console.log('API response:', result);
         
-        if (response.ok && result.success) {
+        if (result.success) {
             alert('Intervention créée avec succès!');
-            window.location.href = '/nodetest/interventions';
+            window.location.href = '/nodetest'; // Redirect to dashboard
         } else {
-            const errorMessage = result.message || result.error || 'Erreur lors de la création';
-            alert(errorMessage);
             console.error('Create error:', result);
+            alert('Erreur lors de la création: ' + (result.message || result.error || 'Erreur inconnue'));
         }
         
     } catch (error) {
         console.error('Error creating intervention:', error);
-        alert('Erreur de connexion');
+        alert('Erreur lors de la création de l\'intervention: ' + error.message);
     } finally {
-        // Reset button
+        // Reset button state
         if (createBtn) {
             createBtn.textContent = originalText;
             createBtn.disabled = false;
         }
     }
 }
-
 // ============================================
 // GLOBAL EXPORTS
 // ============================================

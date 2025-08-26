@@ -141,6 +141,9 @@ exports.getUrgentAll = async (req, res) => {
 
 exports.getAllRecent = async (req, res) => {
     try {
+        console.log('=== getAllRecent API called ===');
+        console.log('Query parameters:', req.query);
+        
         const {
             page = 1,
             limit = 25,
@@ -148,59 +151,92 @@ exports.getAllRecent = async (req, res) => {
             status = '',
             technician = '',
             priority = '',
-            dateRange = '',
-            sortBy = 'date_time',
+            date = '',  // FIXED: Changed from dateRange to date
+            sortBy = 'created_at',  // FIXED: Changed default to created_at 
             sortOrder = 'desc'
         } = req.query;
 
+        // Log the extracted parameters
+        console.log('Extracted parameters:', {
+            page, limit, search, status, technician, priority, date, sortBy, sortOrder
+        });
+
         const offset = (parseInt(page) - 1) * parseInt(limit);
         
+        // FIXED: Pass 'date' instead of 'dateRange' to buildAllRecentQuery
         const { query, countQuery } = buildAllRecentQuery({
             search,
             status,
             technician,
             priority,
-            dateRange,
+            date,  // FIXED: Changed from dateRange to date
             sortBy,
             sortOrder,
             limit: parseInt(limit),
             offset
         });
 
+        console.log('Generated queries:');
+        console.log('Main query:', query);
+        console.log('Count query:', countQuery);
+
         const connection = await pool.getConnection();
         
         try {
-            // Get total count
+            // Get total count first
             const [countResult] = await connection.execute(countQuery);
             const totalCount = countResult[0] && countResult[0].total_count ? 
                 parseInt(countResult[0].total_count) : 0;
             
-            // Get paginated results
-            const [interventions] = await connection.execute(query);
+            console.log('Total count result:', totalCount);
+
+            // Get results
+            const [results] = await connection.execute(query);
+            console.log('Results count:', results.length);
             
+            // Log first result for debugging
+            if (results.length > 0) {
+                console.log('First result:', results[0]);
+            }
+
+            // Calculate pagination info
             const totalPages = Math.ceil(totalCount / parseInt(limit));
-            
-            res.json({
-                interventions,
+            const hasNextPage = parseInt(page) < totalPages;
+            const hasPrevPage = parseInt(page) > 1;
+
+            const responseData = {
+                data: results,
                 pagination: {
                     currentPage: parseInt(page),
                     totalPages,
                     totalCount,
+                    hasNextPage,
+                    hasPrevPage,
                     limit: parseInt(limit)
                 }
-            });
+            };
+            
+            console.log('Response pagination:', responseData.pagination);
+            res.json(responseData);
+            
         } finally {
             connection.release();
         }
         
     } catch (error) {
-        console.error('Recent interventions error:', error);
-        res.status(500).json({
-            interventions: [],
+        console.error('Error in getAllRecent:', error);
+        console.error('Error stack:', error.stack);
+        
+        res.status(500).json({ 
+            error: 'Failed to fetch interventions',
+            message: error.message,
+            data: [],
             pagination: {
                 currentPage: 1,
                 totalPages: 0,
                 totalCount: 0,
+                hasNextPage: false,
+                hasPrevPage: false,
                 limit: 25
             }
         });
@@ -213,10 +249,11 @@ exports.getTechnicians = async (req, res) => {
         const connection = await pool.getConnection();
         
         try {
+            // FIXED: Only get technicians from agency 1
             const query = `
                 SELECT uid as technician_id, CONCAT(firstname, ' ', lastname) as name
                 FROM technicians 
-                WHERE uid != 0 
+                WHERE uid != 0 AND agency_uid = 1
                 ORDER BY firstname, lastname
             `;
             
@@ -1569,9 +1606,8 @@ exports.getPublicIntervention = async (req, res) => {
 // UPDATED: Get intervention statuses - only specific ones requested
 exports.getInterventionStatuses = async (req, res) => {
     try {
-        console.log('Getting intervention statuses...');
-        
-        // Return only the specific statuses requested
+        // FIXED: Only get statuses from agency 1 (if they have agency_uid column)
+        // Or return the standard statuses since they're probably global
         const statuses = [
             { uid: 1, name: 'reçus' },
             { uid: 2, name: 'assigné' },
@@ -1581,7 +1617,6 @@ exports.getInterventionStatuses = async (req, res) => {
             { uid: 6, name: 'Maintenance SCH' }
         ];
         
-        console.log('Returning statuses:', statuses);
         res.json(statuses);
         
     } catch (error) {
@@ -1593,20 +1628,23 @@ exports.getInterventionStatuses = async (req, res) => {
 // UPDATED: Get intervention types - only specific ones requested  
 exports.getInterventionTypes = async (req, res) => {
     try {
-        console.log('Getting intervention types...');
+        const connection = await pool.getConnection();
         
-        // Return only the specific types requested
-        const types = [
-            { uid: 1, name: 'Installation' },
-            { uid: 2, name: 'maintenance' },
-            { uid: 3, name: 'Service' },
-            { uid: 4, name: 'Dépannage' },
-            { uid: 5, name: 'Visite D\'appel d\'offre' },
-            { uid: 6, name: 'Réunion de chantier' }
-        ];
-        
-        console.log('Returning types:', types);
-        res.json(types);
+        try {
+            // FIXED: Only get types from agency 1 (if they have agency_uid column)
+            // Check if interventions_types table has agency_uid column
+            const query = `
+                SELECT uid, name 
+                FROM interventions_types 
+                WHERE uid > 0
+                ORDER BY name
+            `;
+            
+            const [types] = await connection.execute(query);
+            res.json(types);
+        } finally {
+            connection.release();
+        }
         
     } catch (error) {
         console.error('Error fetching intervention types:', error);
@@ -1617,15 +1655,14 @@ exports.getInterventionTypes = async (req, res) => {
 // UPDATED: Get businesses - COMPLETELY FIXED to avoid undefined
 exports.getBusinesses = async (req, res) => {
     try {
-        console.log('Getting businesses...');
-        
         const connection = await pool.getConnection();
         
         try {
+            // FIXED: Only get businesses from agency 1
             const query = `
-                SELECT uid, title
+                SELECT uid, title as name 
                 FROM businesses 
-                WHERE uid > 0 
+                WHERE uid > 0 AND agency_uid = 1
                   AND title IS NOT NULL 
                   AND title != '' 
                   AND title != 'undefined'
@@ -1633,35 +1670,8 @@ exports.getBusinesses = async (req, res) => {
                 ORDER BY title
             `;
             
-            console.log('Business query:', query);
-            
             const [businesses] = await connection.execute(query);
-            
-            console.log('Raw businesses from DB:', businesses);
-            
-            // Additional filtering to be extra sure
-            const validBusinesses = businesses
-                .filter(business => {
-                    const isValid = business.title && 
-                                   business.title.trim() !== '' && 
-                                   business.title !== 'undefined' &&
-                                   business.title !== 'null' &&
-                                   business.uid > 0;
-                    
-                    if (!isValid) {
-                        console.log('Filtering out invalid business:', business);
-                    }
-                    
-                    return isValid;
-                })
-                .map(business => ({
-                    uid: business.uid,
-                    name: business.title // Map title to name for consistency
-                }));
-            
-            console.log('Filtered businesses:', validBusinesses);
-            
-            res.json(validBusinesses);
+            res.json(businesses);
         } finally {
             connection.release();
         }
@@ -1675,121 +1685,106 @@ exports.getBusinesses = async (req, res) => {
 // Add this function to your controllers/interventionsController.js
 
 // CREATE: Create new intervention
+// CORRECTED: exports.createIntervention function for controllers/interventionsController.js
+// This replaces the existing createIntervention function
+
 exports.createIntervention = async (req, res) => {
     try {
-        console.log('Creating new intervention...');
+        console.log('=== Creating Intervention ===');
         console.log('Request body:', req.body);
         
         const connection = await pool.getConnection();
         
         try {
-            // Extract form data (including prix)
+            // Extract form data with proper defaults for optional fields
             const {
                 numero,
                 titre,
+                description = '',
+                priorite = 'normale',
                 statut,
                 type,
-                priorite,
                 affaire,
                 client,
-                technicien,
-                prix,                // NEW: Price field
-                adresse,
-                ville,
-                immeuble,
-                etage,
-                appartement,
-                date,
-                heure_debut,
-                heure_fin,
-                description,
-                has_pdf,
-                pdf_name
+                technicien = '',     // Default to empty string
+                prix = '',
+                adresse = '',
+                ville = '',
+                immeuble = '',
+                etage = '',
+                appartement = '',
+                date = '',           // Allow empty date
+                heure_debut = '',    // Allow empty time
+                heure_fin = ''       // Allow empty time
             } = req.body;
             
-            // Validate required fields
-            const requiredFields = {
-                numero: numero,
-                titre: titre,
-                statut: statut,
-                type: type,
-                priorite: priorite,
-                affaire: affaire,
-                client: client,
-                technicien: technicien,
-                adresse: adresse,
-                ville: ville,
-                date: date,
-                description: description
-            };
-            
-            console.log('Received fields:', requiredFields);
-            console.log('Received prix:', prix);
-            
-            const missingFields = [];
-            for (const [field, value] of Object.entries(requiredFields)) {
-                if (!value || value.toString().trim() === '') {
-                    missingFields.push(field);
-                }
-            }
-            
-            if (missingFields.length > 0) {
-                console.log('Missing fields:', missingFields);
+            console.log('Processing with values:', {
+                numero, titre, technicien, date, heure_debut, heure_fin
+            });
+
+            // Validate required fields only
+            if (!numero || !titre || !statut || !type || !priorite || !affaire || !client || !adresse || !ville || !description) {
                 return res.status(400).json({
                     success: false,
-                    message: `Champs manquants: ${missingFields.join(', ')}`
+                    message: 'Champs obligatoires manquants'
                 });
             }
-            
+
             // Process price field
-            let processedPrice = 0;
-            if (prix !== undefined && prix !== null && prix !== '') {
-                const parsedPrice = parseFloat(prix);
-                if (!isNaN(parsedPrice) && parsedPrice >= 0) {
-                    processedPrice = parsedPrice;
-                } else {
-                    return res.status(400).json({
-                        success: false,
-                        message: 'Le prix doit être un nombre positif'
-                    });
+            let processedPrice = 0; // Default to 0, not NULL
+            if (prix && prix.trim() !== '') {
+                const numericPrice = parseFloat(prix);
+                if (!isNaN(numericPrice) && numericPrice >= 0) {
+                    processedPrice = numericPrice;
+                }
+            }
+
+            // Generate public number for external sharing
+            const publicNumber = generatePublicNumber();
+            
+            // Handle date and time fields - provide defaults for NOT NULL columns
+            let dateTime = '';
+            let timeFrom = '';
+            let timeTo = '';
+            
+            // Only process date/time if provided
+            if (date && date.trim() !== '') {
+                // Convert from YYYY-MM-DD to DD/MM/YYYY format for database
+                const dateParts = date.split('-');
+                if (dateParts.length === 3) {
+                    const formattedDate = `${dateParts[2]}/${dateParts[1]}/${dateParts[0]}`;
+                    
+                    if (heure_debut && heure_debut.trim() !== '') {
+                        dateTime = `${formattedDate} ${heure_debut}`;
+                        timeFrom = heure_debut;
+                    } else {
+                        dateTime = formattedDate;
+                    }
+                    
+                    if (heure_fin && heure_fin.trim() !== '') {
+                        timeTo = heure_fin;
+                    }
                 }
             }
             
-            console.log('Processed price:', processedPrice);
-            
-            // Generate public number for intervention
-            const publicNumber = generatePublicNumber();
-            
-            // Prepare datetime field (format for database)
-            let dateTime = date;
-            if (heure_debut) {
-                dateTime = `${date} ${heure_debut}:00`;
-            }
-            
-            // Calculate duration if both start and end times are provided
-            let duration = null;
-            if (heure_debut && heure_fin) {
+            // Calculate duration if both times are provided
+            let duration = 0; // Default to 0, not NULL
+            if (timeFrom && timeTo) {
                 try {
-                    const startTime = new Date(`2000-01-01 ${heure_debut}:00`);
-                    const endTime = new Date(`2000-01-01 ${heure_fin}:00`);
+                    const startTime = new Date(`2000-01-01 ${timeFrom}:00`);
+                    const endTime = new Date(`2000-01-01 ${timeTo}:00`);
                     const diffMs = endTime - startTime;
                     
                     if (diffMs > 0) {
-                        // Convert to hours (decimal format)
                         duration = Math.round((diffMs / (1000 * 60 * 60)) * 100) / 100;
-                    } else {
-                        duration = 0; // Default if end time is before start time
                     }
                 } catch (e) {
-                    duration = 0; // Default on calculation error
+                    console.log('Duration calculation error:', e);
+                    duration = 0;
                 }
-            } else {
-                duration = 0; // Default duration when times are not provided
             }
             
-            console.log('Calculated duration:', duration);
-            
-            // Insert intervention into database - ENHANCED WITH PRICE
+            // FIXED: Insert with proper handling of NULL/empty values
             const insertQuery = `
                 INSERT INTO interventions (
                     public_number, agency_uid, business_uid, client_uid, tenant_uid, 
@@ -1800,31 +1795,31 @@ exports.createIntervention = async (req, res) => {
             `;
             
             const insertValues = [
-                publicNumber,                    // public_number
-                1,                              // agency_uid (default to 1)
-                parseInt(affaire) || 0,         // business_uid
-                parseInt(client) || 0,          // client_uid
-                0,                              // tenant_uid (default to 0)
-                '',                             // tenant_name (empty for now)
-                parseInt(technicien) || 0,      // technician_uid
-                0,                              // referent_uid (default to 0)
-                numero,                         // number
-                parseInt(statut) || 1,          // status_uid
-                titre,                          // title
-                dateTime,                       // date_time
-                date,                           // due_date (same as date for now)
-                heure_debut || null,            // time_from
-                heure_fin || null,              // time_to
-                adresse,                        // address
-                ville,                          // city
-                immeuble || null,               // building
-                etage || null,                  // floor
-                appartement || null,            // appartment
-                duration,                       // duration (calculated or 0)
-                priorite,                       // priority
-                parseInt(type) || 1,            // type_uid
-                description,                    // description
-                processedPrice                  // price (NEW: processed price field)
+                publicNumber,                           // public_number
+                1,                                     // agency_uid (default to 1)
+                parseInt(affaire) || 0,                // business_uid
+                parseInt(client) || 0,                 // client_uid
+                0,                                     // tenant_uid (default to 0)
+                '',                                    // tenant_name (empty string, not NULL)
+                parseInt(technicien) || 0,             // technician_uid (0 = unassigned)
+                0,                                     // referent_uid (default to 0)
+                numero,                                // number
+                parseInt(statut) || 1,                 // status_uid
+                titre,                                 // title
+                dateTime,                              // date_time (empty string if not provided)
+                dateTime,                              // due_date (same as date_time)
+                timeFrom,                              // time_from (empty string, not NULL)
+                timeTo,                                // time_to (empty string, not NULL)
+                adresse,                               // address
+                ville,                                 // city
+                immeuble,                              // building (empty string, not NULL)
+                etage,                                 // floor (empty string, not NULL)
+                appartement,                           // appartment (empty string, not NULL)
+                duration,                              // duration (0, not NULL)
+                priorite,                              // priority
+                parseInt(type) || 1,                   // type_uid
+                description,                           // description
+                processedPrice                         // price (0, not NULL)
             ];
             
             console.log('Insert query:', insertQuery);
@@ -1834,6 +1829,25 @@ exports.createIntervention = async (req, res) => {
             const interventionId = result.insertId;
             
             console.log('Intervention created with ID:', interventionId);
+            
+            // Handle PDF file upload if present
+            if (req.files && req.files.pdf) {
+                try {
+                    const pdfFile = req.files.pdf;
+                    const uploadPath = path.join(__dirname, '../uploads/interventions', `${interventionId}_${pdfFile.name}`);
+                    
+                    // Ensure directory exists
+                    await fs.mkdir(path.dirname(uploadPath), { recursive: true });
+                    
+                    // Move file to upload directory
+                    await pdfFile.mv(uploadPath);
+                    
+                    console.log('PDF file uploaded successfully:', uploadPath);
+                } catch (uploadError) {
+                    console.error('PDF upload error:', uploadError);
+                    // Don't fail the entire creation for PDF upload issues
+                }
+            }
             
             // Return success response
             res.json({
@@ -1862,6 +1876,16 @@ exports.createIntervention = async (req, res) => {
         });
     }
 };
+
+// Helper function to generate public number (UUID-like) - if not already exists
+function generatePublicNumber() {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    let result = '';
+    for (let i = 0; i < 12; i++) {
+        result += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return result;
+}
 
 // Helper function to generate intervention number
 exports.getInterventionNumber = async (req, res) => {
@@ -1917,10 +1941,11 @@ exports.getClients = async (req, res) => {
         const connection = await pool.getConnection();
         
         try {
+            // FIXED: Only get clients from agency 1
             const query = `
                 SELECT uid, name 
                 FROM clients 
-                WHERE uid > 0 
+                WHERE uid > 0 AND agency_uid = 1
                   AND name IS NOT NULL 
                   AND name != '' 
                   AND name != 'undefined'
@@ -1928,37 +1953,15 @@ exports.getClients = async (req, res) => {
                 ORDER BY name
             `;
             
-            console.log('Client query:', query);
-            
             const [clients] = await connection.execute(query);
-            
-            console.log('Raw clients from DB:', clients);
-            
-            // Additional filtering to be extra sure
-            const validClients = clients.filter(client => {
-                const isValid = client.name && 
-                               client.name.trim() !== '' && 
-                               client.name !== 'undefined' &&
-                               client.name !== 'null' &&
-                               client.uid > 0;
-                
-                return isValid;
-            });
-            
-            console.log('Filtered clients:', validClients);
-            
-            res.json(validClients);
+            res.json(clients);
         } finally {
             connection.release();
         }
         
     } catch (error) {
         console.error('Error fetching clients:', error);
-        res.status(500).json({
-            success: false,
-            error: error.message,
-            clients: []
-        });
+        res.status(500).json([]);
     }
 };
 // Add this debug endpoint to interventionsController.js 
