@@ -1658,27 +1658,215 @@ exports.getBusinesses = async (req, res) => {
         const connection = await pool.getConnection();
         
         try {
-            // FIXED: Only get businesses from agency 1
+            // FIXED: Added b.number field to SELECT - this was missing before
             const query = `
-                SELECT uid, title as name 
-                FROM businesses 
-                WHERE uid > 0 AND agency_uid = 1
-                  AND title IS NOT NULL 
-                  AND title != '' 
-                  AND title != 'undefined'
-                  AND TRIM(title) != ''
-                ORDER BY title
+                SELECT 
+                    b.uid, 
+                    b.title, 
+                    b.number,
+                    b.client_uid, 
+                    b.tenant_uid, 
+                    c.name as client_name 
+                FROM businesses b 
+                INNER JOIN clients c ON b.client_uid = c.uid 
+                WHERE b.uid != 0 AND b.agency_uid = ?
+                ORDER BY CAST(b.number AS UNSIGNED) ASC
             `;
             
-            const [businesses] = await connection.execute(query);
-            res.json(businesses);
+            const [result] = await connection.execute(query, [1]); // Replace 1 with actual agency_uid from session/token
+            
+            // Format for dropdown compatibility
+            const businesses_array = {};
+            businesses_array[0] = "Choisissez une affaire...";
+            
+            for(let i = 0; i < result.length; i++) {
+                const business = result[i];
+                // FIXED: Include number in display - this fixes your "no number" issue
+                const value = business.number ? `${business.number} - ${business.title}` : business.title;
+                businesses_array[business.uid] = value;
+            }
+            
+            console.log(`Loaded ${result.length} total businesses with numbers`);
+            
+            res.json({
+                code: '1',
+                message: 'success',
+                response: businesses_array
+            });
+            
         } finally {
             connection.release();
         }
         
     } catch (error) {
-        console.error('Error fetching businesses:', error);
-        res.status(500).json([]);
+        console.error('Error getting businesses:', error);
+        res.json({
+            code: '0',
+            message: 'failed',
+            error: error.message
+        });
+    }
+};
+
+exports.getBusinessesByStatusAndType = async (req, res) => {
+    try {
+        const { status_uid, business_type, agency_uid = 1 } = req.body;
+        
+        // Define business numbers for each type based on your requirements
+        const maintenanceNumbers = [104, 123, 139, 140, 161];
+        const chantierNumbers = [144, 146, 150, 155, 156, 157, 158, 159, 160, 162, 163, 164, 165, 166, 167, 168, 169, 170, 171, 172, 173, 175, 176, 177, 178, 179, 180, 181, 182, 183, 184];
+        
+        const connection = await pool.getConnection();
+        
+        try {
+            let businessNumbers = [];
+            
+            if (business_type === 'maintenance') {
+                businessNumbers = maintenanceNumbers;
+            } else if (business_type === 'chantier') {
+                businessNumbers = chantierNumbers;
+            } else {
+                return res.json({ 
+                    code: '0', 
+                    message: 'Invalid business type. Use "maintenance" or "chantier"' 
+                });
+            }
+            
+            // Create the WHERE clause for business numbers
+            const placeholders = businessNumbers.map(() => '?').join(',');
+            
+            // Query with business number filtering - INCLUDES the number field that was missing
+            const query = `
+                SELECT 
+                    b.uid, 
+                    b.title, 
+                    b.number, 
+                    b.client_uid, 
+                    b.tenant_uid, 
+                    c.name as client_name 
+                FROM businesses b 
+                INNER JOIN clients c ON b.client_uid = c.uid 
+                WHERE b.uid != 0 
+                    AND b.agency_uid = ? 
+                    AND CAST(b.number AS UNSIGNED) IN (${placeholders})
+                ORDER BY CAST(b.number AS UNSIGNED) ASC
+            `;
+            
+            const queryParams = [agency_uid, ...businessNumbers];
+            const [result] = await connection.execute(query, queryParams);
+            
+            // Format response like old_Astro for compatibility with existing frontend
+            const businesses_array = {};
+            businesses_array[0] = `Toutes les affaires ${business_type}...`;
+            
+            for(let i = 0; i < result.length; i++) {
+                const business = result[i];
+                // This will now show "104 - Business Title" instead of "no number"
+                const value = business.number ? `${business.number} - ${business.title}` : business.title;
+                businesses_array[business.uid] = value;
+            }
+            
+            console.log(`Found ${result.length} ${business_type} businesses`);
+            
+            res.json({
+                code: '1',
+                message: 'success',
+                response: businesses_array,
+                business_type: business_type,
+                filtered_count: result.length
+            });
+            
+        } finally {
+            connection.release();
+        }
+        
+    } catch (error) {
+        console.error('Error getting businesses by status and type:', error);
+        res.json({
+            code: '0',
+            message: 'failed',
+            error: error.message
+        });
+    }
+};
+
+exports.getBusinessCategories = async (req, res) => {
+    try {
+        const maintenanceNumbers = [104, 123, 139, 140, 161];
+        const chantierNumbers = [144, 146, 150, 155, 156, 157, 158, 159, 160, 162, 163, 164, 165, 166, 167, 168, 169, 170, 171, 172, 173, 175, 176, 177, 178, 179, 180, 181, 182, 183, 184];
+        
+        res.json({
+            code: '1',
+            message: 'success',
+            maintenance_numbers: maintenanceNumbers,
+            chantier_numbers: chantierNumbers,
+            categories: {
+                maintenance: {
+                    label: 'Maintenance',
+                    numbers: maintenanceNumbers,
+                    count: maintenanceNumbers.length
+                },
+                chantier: {
+                    label: 'Chantiers', 
+                    numbers: chantierNumbers,
+                    count: chantierNumbers.length
+                }
+            }
+        });
+        
+    } catch (error) {
+        console.error('Error getting business categories:', error);
+        res.json({
+            code: '0',
+            message: 'failed',
+            error: error.message
+        });
+    }
+};
+
+exports.getBusinessesArray = async (req, res) => {
+    try {
+        const connection = await pool.getConnection();
+        
+        try {
+            const query = `
+                SELECT 
+                    b.uid, 
+                    b.title, 
+                    b.number,
+                    b.client_uid, 
+                    b.tenant_uid, 
+                    c.name as client_name 
+                FROM businesses b 
+                INNER JOIN clients c ON b.client_uid = c.uid 
+                WHERE b.uid != 0 AND b.agency_uid = ?
+                ORDER BY CAST(b.number AS UNSIGNED) ASC
+            `;
+            
+            const [result] = await connection.execute(query, [1]);
+            
+            // Format as array with proper number display
+            const businesses = result.map(business => ({
+                uid: business.uid,
+                name: business.number ? `${business.number} - ${business.title}` : business.title,
+                title: business.title,
+                number: business.number,
+                client_uid: business.client_uid,
+                client_name: business.client_name
+            }));
+            
+            res.json(businesses);
+            
+        } finally {
+            connection.release();
+        }
+        
+    } catch (error) {
+        console.error('Error getting businesses array:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Erreur lors du chargement des affaires'
+        });
     }
 };
 

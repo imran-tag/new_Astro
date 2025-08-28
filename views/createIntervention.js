@@ -1,4 +1,4 @@
-// views/createIntervention.js - Enhanced intervention creation form with Price field
+// views/createIntervention.js - Enhanced with Maintenance/Chantier Business Separation
 
 function getCreateInterventionHTML() {
     return `<!DOCTYPE html>
@@ -65,51 +65,43 @@ function getCreateInterventionHTML() {
             color: white;
         }
         
-        .step-number.completed {
-            background-color: #10b981;
-            color: white;
-        }
-        
         .step-number.inactive {
             background-color: #e5e7eb;
             color: #6b7280;
         }
         
+        .step-number.completed {
+            background-color: #10b981;
+            color: white;
+        }
+        
         .step-line {
-            width: 4rem;
+            width: 3rem;
             height: 2px;
             background-color: #e5e7eb;
+            margin: 0 1rem;
         }
         
         .step-line.completed {
             background-color: #10b981;
         }
+        
+        /* Progressive selection styling */
+        .select-disabled {
+            background-color: #f3f4f6;
+            color: #9ca3af;
+            cursor: not-allowed;
+        }
+        
+        .business-type-info {
+            background: linear-gradient(135deg, #e3f2fd 0%, #f8f9fa 100%);
+            border-left: 4px solid #2196f3;
+        }
     </style>
 </head>
-<body class="bg-gray-100">
-    <!-- Navigation -->
-    <nav class="bg-white shadow-sm border-b border-gray-200">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="flex justify-between h-16">
-                <div class="flex items-center">
-                    <a href="/nodetest" class="flex items-center space-x-2">
-                        <i class="fas fa-rocket text-blue-600 text-xl"></i>
-                        <span class="text-xl font-bold text-gray-900">Astro</span>
-                    </a>
-                </div>
-                <div class="flex items-center space-x-4">
-                    <a href="/nodetest" class="text-gray-600 hover:text-blue-600 transition-colors">
-                        <i class="fas fa-home mr-2"></i>Tableau de bord
-                    </a>
-                    <a href="/nodetest/interventions" class="text-gray-600 hover:text-blue-600 transition-colors">
-                        <i class="fas fa-list mr-2"></i>Interventions
-                    </a>
-                </div>
-            </div>
-        </div>
-    </nav>
-
-    <main class="max-w-4xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
+<body class="bg-gray-50 min-h-screen">
+    <main class="container mx-auto px-4 py-8 max-w-4xl">
+        
         <!-- Page Header -->
         <div class="text-center mb-8">
             <h1 class="text-3xl font-bold text-gray-900 mb-2">
@@ -149,47 +141,57 @@ function getCreateInterventionHTML() {
                     Téléchargez le PDF du Bon de commande et remplissez le formulaire d'intervention.
                 </p>
                 
-                <!-- Upload Area -->
-                <div id="upload-area" class="upload-area p-8 text-center rounded-lg mb-6">
+                <div class="upload-area rounded-lg p-8 text-center cursor-pointer mb-6" 
+                     onclick="document.getElementById('pdfFile').click()"
+                     ondrop="handlePDFDrop(event)"
+                     ondragover="handlePDFDragOver(event)"
+                     ondragleave="handlePDFDragLeave(event)">
+                    
                     <div id="upload-content">
                         <i class="fas fa-cloud-upload-alt text-4xl text-gray-400 mb-4"></i>
-                        <p class="text-lg font-medium text-gray-700 mb-2">Cliquez pour sélectionner un fichier PDF</p>
-                        <p class="text-sm text-gray-500 mb-4">ou glissez-déposez votre fichier ici</p>
-                        <p class="text-xs text-gray-400">Taille maximum: 10MB</p>
+                        <p class="text-gray-600 mb-2">Cliquez ici ou glissez-déposez votre PDF</p>
+                        <p class="text-sm text-gray-500">Format accepté: PDF (Max 10MB)</p>
                     </div>
                     
-                    <div id="upload-success" class="hidden">
-                        <!-- Success content will be inserted here -->
+                    <input type="file" id="pdfFile" name="pdfFile" accept=".pdf" 
+                           onchange="handlePDFFile(this)" class="hidden">
+                </div>
+                
+                <div id="pdf-preview" class="hidden bg-gray-50 rounded-lg p-4 mb-6">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center">
+                            <i class="fas fa-file-pdf text-red-500 text-2xl mr-3"></i>
+                            <div>
+                                <p class="font-medium text-gray-900" id="pdf-name"></p>
+                                <p class="text-sm text-gray-500" id="pdf-size"></p>
+                            </div>
+                        </div>
+                        <button type="button" onclick="removePDF()" 
+                                class="text-red-500 hover:text-red-700 transition-colors">
+                            <i class="fas fa-times"></i>
+                        </button>
                     </div>
                 </div>
                 
-                <input type="file" id="pdf-file-input" accept=".pdf" class="hidden">
-                
-                <div class="text-center text-sm text-gray-500 mb-6">
-                    <p><i class="fas fa-info-circle mr-1"></i>
-                    L'upload du Bon de commande est optionnel</p>
-                </div>
-                
-                <div class="flex justify-between">
-                    <button type="button" onclick="skipUpload()" class="px-6 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors">
-                        <i class="fas fa-forward mr-2"></i>Passer cette étape
-                    </button>
-                    <button type="button" onclick="nextStep()" id="next-step-1" class="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors">
+                <div class="flex justify-end">
+                    <button type="button" onclick="nextStep()" id="next-step-1" 
+                            class="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors">
                         Suivant <i class="fas fa-arrow-right ml-2"></i>
                     </button>
                 </div>
             </div>
         </div>
 
-        <!-- Step 2: Form Details -->
+        <!-- Step 2: Intervention Details -->
         <div id="step-2" class="form-section">
             <div class="bg-white rounded-lg shadow border border-gray-200 p-6">
                 <h2 class="text-xl font-semibold text-gray-900 mb-6">
-                    <i class="fas fa-edit mr-2 text-blue-500"></i>
+                    <i class="fas fa-edit mr-2 text-blue-600"></i>
                     Détails de l'Intervention
                 </h2>
                 
                 <form id="intervention-form" class="space-y-6">
+                    
                     <!-- Row 1: Numéro, Titre -->
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div>
@@ -210,11 +212,52 @@ function getCreateInterventionHTML() {
                         </div>
                     </div>
 
+                    <!-- NEW: Status and Business Type Selection -->
+                    <div class="business-type-info rounded-lg p-4 mb-6">
+                        <h3 class="text-lg font-medium text-gray-900 mb-4">
+                            <i class="fas fa-filter mr-2"></i>
+                            Sélection des Affaires
+                        </h3>
+                        <p class="text-sm text-gray-600 mb-4">
+                            Choisissez d'abord le statut puis le type d'affaire pour filtrer la liste des affaires disponibles.
+                        </p>
+                        
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <!-- Status Selection -->
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">
+                                    1. Statut <span class="text-red-500">*</span>
+                                </label>
+                                <select id="intervention-status" name="intervention-status" required
+                                        class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                    <option value="">Choisir un statut...</option>
+                                    <option value="received">📥 Reçus</option>
+                                    <option value="assigned">📋 Assigné</option>
+                                </select>
+                                <p class="text-xs text-gray-500 mt-1">Étape 1: Sélectionnez le statut de l'intervention</p>
+                            </div>
+                            
+                            <!-- Business Type Selection -->
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">
+                                    2. Type d'affaire <span class="text-red-500">*</span>
+                                </label>
+                                <select id="business-type" name="business-type" required disabled
+                                        class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 select-disabled">
+                                    <option value="">Choisir un type...</option>
+                                    <option value="maintenance">🔧 Maintenance (104, 123, 139, 140, 161)</option>
+                                    <option value="chantier">🏗️ Chantiers (144, 146, 150+)</option>
+                                </select>
+                                <p class="text-xs text-gray-500 mt-1">Étape 2: Sélectionnez le type d'affaire</p>
+                            </div>
+                        </div>
+                    </div>
+
                     <!-- Row 2: Statut, Type, Priorité -->
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-2">
-                                Statut <span class="text-red-500">*</span>
+                                Statut intervention <span class="text-red-500">*</span>
                             </label>
                             <select id="statut" name="statut" required
                                     class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
@@ -237,23 +280,24 @@ function getCreateInterventionHTML() {
                             <select id="priorite" name="priorite" required
                                     class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
                                 <option value="">Sélectionner une priorité</option>
-                                <option value="Normale">Normale</option>
-                                <option value="Importante">Importante</option>
-                                <option value="Urgente">Urgente</option>
+                                <option value="Normale">⚪ Normale</option>
+                                <option value="Importante">🟡 Importante</option>
+                                <option value="Urgente">🔴 Urgente</option>
                             </select>
                         </div>
                     </div>
 
-                    <!-- Row 3: Affaire, Client, Prix -->
+                    <!-- Row 3: Affaire (Business), Client, Prix -->
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-2">
-                                Affaire <span class="text-red-500">*</span>
+                                3. Affaire <span class="text-red-500">*</span>
                             </label>
-                            <select id="affaire" name="affaire" required
-                                    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
-                                <option value="">Sélectionner une affaire</option>
+                            <select id="affaire" name="affaire" required disabled
+                                    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 select-disabled">
+                                <option value="">D'abord choisir le statut et le type...</option>
                             </select>
+                            <p class="text-xs text-gray-500 mt-1">Étape 3: Liste filtrée selon vos choix précédents</p>
                         </div>
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-2">
@@ -307,7 +351,7 @@ function getCreateInterventionHTML() {
                         </div>
                     </div>
 
-                    <!-- Row 6: Immeuble, Etage, Appartement -->
+                    <!-- Row 6: Immeuble, Étage, Appartement -->
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-2">
@@ -315,7 +359,7 @@ function getCreateInterventionHTML() {
                             </label>
                             <input type="text" id="immeuble" name="immeuble"
                                    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                   placeholder="Nom de l'immeuble">
+                                   placeholder="Nom/Numéro immeuble">
                         </div>
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-2">
@@ -331,7 +375,7 @@ function getCreateInterventionHTML() {
                             </label>
                             <input type="text" id="appartement" name="appartement"
                                    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                   placeholder="Numéro d'appartement">
+                                   placeholder="Numéro appartement">
                         </div>
                     </div>
 
@@ -339,21 +383,21 @@ function getCreateInterventionHTML() {
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-2">
-                                Date 
+                                Date
                             </label>
-                            <input type="date" id="date" name="date" 
+                            <input type="date" id="date" name="date"
                                    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
                         </div>
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-2">
-                                Heure de début
+                                Heure début
                             </label>
                             <input type="time" id="heure_debut" name="heure_debut"
                                    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
                         </div>
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-2">
-                                Heure de fin
+                                Heure fin
                             </label>
                             <input type="time" id="heure_fin" name="heure_fin"
                                    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
@@ -365,9 +409,9 @@ function getCreateInterventionHTML() {
                         <label class="block text-sm font-medium text-gray-700 mb-2">
                             Description <span class="text-red-500">*</span>
                         </label>
-                        <textarea id="description" name="description" rows="4" required
+                        <textarea id="description" name="description" required rows="4"
                                   class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                  placeholder="Décrivez l'intervention..."></textarea>
+                                  placeholder="Description détaillée de l'intervention à effectuer..."></textarea>
                     </div>
                 </form>
                 

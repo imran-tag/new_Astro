@@ -1,11 +1,15 @@
-// public/js/createIntervention.js - Enhanced with Price field support
+// public/js/createIntervention.js - Enhanced with Maintenance/Chantier Business Separation
 
-console.log('Loading createIntervention.js');
+console.log('Loading createIntervention.js with business separation');
 
 // Global variables
 let uploadedPDFFile = null;
 let currentStep = 1;
 const totalSteps = 3;
+
+// NEW: Business selection state
+let selectedStatus = null;
+let selectedBusinessType = null;
 
 // Initialize when page loads
 document.addEventListener('DOMContentLoaded', function() {
@@ -20,18 +24,11 @@ function initializePage() {
     loadInterventionNumber();
     loadInterventionStatuses();
     loadInterventionTypes();
-    loadBusinesses();
+    loadAllBusinesses(); // Load all businesses initially as fallback
     loadTechnicians();
     
     // Setup event listeners
     setupEventListeners();
-    
-    // REMOVED: Auto-set today's date
-    // const dateInput = document.getElementById('date');
-    // if (dateInput) {
-    //     const today = new Date().toISOString().split('T')[0];
-    //     dateInput.value = today;
-    // }
     
     // Show first step
     showStep(1);
@@ -41,6 +38,20 @@ function initializePage() {
 
 function setupEventListeners() {
     console.log('Setting up event listeners...');
+    
+    // NEW: Status selection handler
+    const statusSelect = document.getElementById('intervention-status');
+    if (statusSelect) {
+        statusSelect.addEventListener('change', handleStatusSelection);
+        console.log('Status select listener added');
+    }
+    
+    // NEW: Business type selection handler
+    const businessTypeSelect = document.getElementById('business-type');
+    if (businessTypeSelect) {
+        businessTypeSelect.addEventListener('change', handleBusinessTypeSelection);
+        console.log('Business type select listener added');
+    }
     
     // Business selection change
     const affaireSelect = document.getElementById('affaire');
@@ -53,7 +64,6 @@ function setupEventListeners() {
     const priceInput = document.getElementById('prix');
     if (priceInput) {
         priceInput.addEventListener('blur', function() {
-            // Format price on blur (when user leaves the field)
             if (this.value && !isNaN(this.value)) {
                 this.value = parseFloat(this.value).toFixed(2);
             }
@@ -61,42 +71,137 @@ function setupEventListeners() {
         console.log('Price input listener added');
     }
     
-    // Upload area click
-    const uploadArea = document.getElementById('upload-area');
-    const fileInput = document.getElementById('pdf-file-input');
+    // Upload area drag and drop
+    const uploadArea = document.querySelector('.upload-area');
+    if (uploadArea) {
+        uploadArea.addEventListener('dragover', handlePDFDragOver);
+        uploadArea.addEventListener('dragleave', handlePDFDragLeave);
+        uploadArea.addEventListener('drop', handlePDFDrop);
+        console.log('Upload area listeners added');
+    }
+}
+
+// ============================================
+// NEW: BUSINESS SEPARATION LOGIC
+// ============================================
+
+function handleStatusSelection() {
+    const statusSelect = document.getElementById('intervention-status');
+    const businessTypeSelect = document.getElementById('business-type');
+    const affaireSelect = document.getElementById('affaire');
     
-    if (uploadArea && fileInput) {
-        uploadArea.addEventListener('click', function() {
-            fileInput.click();
+    selectedStatus = statusSelect.value;
+    
+    console.log('Status selected:', selectedStatus);
+    
+    if (selectedStatus) {
+        // Enable business type selection
+        businessTypeSelect.disabled = false;
+        businessTypeSelect.classList.remove('select-disabled');
+        businessTypeSelect.value = '';
+        
+        // Reset business selection
+        affaireSelect.value = '';
+        affaireSelect.disabled = true;
+        affaireSelect.classList.add('select-disabled');
+        affaireSelect.innerHTML = '<option value="">D\'abord choisir le type...</option>';
+        
+        // Reset selected business type
+        selectedBusinessType = null;
+        
+        console.log('Business type selector enabled');
+    } else {
+        // Disable subsequent selects
+        businessTypeSelect.disabled = true;
+        businessTypeSelect.classList.add('select-disabled');
+        businessTypeSelect.value = '';
+        
+        affaireSelect.disabled = true;
+        affaireSelect.classList.add('select-disabled');
+        affaireSelect.innerHTML = '<option value="">D\'abord choisir le statut et le type...</option>';
+        
+        selectedBusinessType = null;
+        
+        console.log('Business type selector disabled');
+    }
+}
+
+function handleBusinessTypeSelection() {
+    const businessTypeSelect = document.getElementById('business-type');
+    const affaireSelect = document.getElementById('affaire');
+    
+    selectedBusinessType = businessTypeSelect.value;
+    
+    console.log('Business type selected:', selectedBusinessType);
+    
+    if (selectedStatus && selectedBusinessType) {
+        // Enable business selection and load filtered businesses
+        affaireSelect.disabled = false;
+        affaireSelect.classList.remove('select-disabled');
+        
+        // Load filtered businesses
+        loadBusinessesByType(selectedStatus, selectedBusinessType);
+        
+        console.log('Loading filtered businesses for:', selectedStatus, selectedBusinessType);
+    } else {
+        // Disable business selection
+        affaireSelect.disabled = true;
+        affaireSelect.classList.add('select-disabled');
+        affaireSelect.innerHTML = '<option value="">D\'abord choisir le type...</option>';
+        
+        console.log('Business selector disabled');
+    }
+}
+
+async function loadBusinessesByType(status, businessType) {
+    try {
+        console.log('Loading businesses by type:', status, businessType);
+        
+        const response = await fetch('/nodetest/api/get-businesses-by-status-and-type', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                status_uid: status === 'received' ? 1 : 2, // Adjust based on your status UIDs
+                business_type: businessType,
+                agency_uid: 1 // Get from session/token in real implementation
+            })
         });
         
-        fileInput.addEventListener('change', function(e) {
-            if (e.target.files && e.target.files[0]) {
-                handlePDFUpload(e.target.files[0]);
-            }
-        });
+        const result = await response.json();
+        console.log('Businesses by type response:', result);
         
-        // Drag and drop
-        uploadArea.addEventListener('dragover', function(e) {
-            e.preventDefault();
-            uploadArea.classList.add('dragover');
-        });
-        
-        uploadArea.addEventListener('dragleave', function(e) {
-            e.preventDefault();
-            uploadArea.classList.remove('dragover');
-        });
-        
-        uploadArea.addEventListener('drop', function(e) {
-            e.preventDefault();
-            uploadArea.classList.remove('dragover');
+        const affaireSelect = document.getElementById('affaire');
+        if (affaireSelect && result.code === '1') {
+            affaireSelect.innerHTML = '<option value="">Choisir une affaire...</option>';
             
-            if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-                handlePDFUpload(e.dataTransfer.files[0]);
+            Object.entries(result.response).forEach(([key, value]) => {
+                if (key !== '0') { // Skip default option
+                    const option = document.createElement('option');
+                    option.value = key;
+                    option.textContent = value; // Now includes number like "104 - Business Title"
+                    affaireSelect.appendChild(option);
+                }
+            });
+            
+            console.log(`Loaded ${result.filtered_count || 'some'} ${businessType} businesses`);
+            
+            // Show success message
+            if (result.filtered_count !== undefined) {
+                showNotification(`${result.filtered_count} affaire(s) ${businessType} chargée(s)`, 'success');
             }
-        });
+        } else {
+            console.error('Failed to load businesses by type:', result);
+            affaireSelect.innerHTML = '<option value="">Aucune affaire trouvée pour ce type</option>';
+            showNotification('Aucune affaire trouvée pour ce type', 'warning');
+        }
         
-        console.log('Upload listeners added');
+    } catch (error) {
+        console.error('Error loading businesses by type:', error);
+        const affaireSelect = document.getElementById('affaire');
+        if (affaireSelect) {
+            affaireSelect.innerHTML = '<option value="">Erreur de chargement</option>';
+        }
+        showNotification('Erreur lors du chargement des affaires', 'error');
     }
 }
 
@@ -108,17 +213,15 @@ function nextStep() {
     console.log('Next step called, current:', currentStep);
     
     if (currentStep < totalSteps) {
-        // Validate current step
-        if (currentStep === 2 && !validateForm()) {
-            return;
-        }
-        
-        currentStep++;
-        showStep(currentStep);
-        
-        // Generate summary if moving to step 3
-        if (currentStep === 3) {
-            generateSummary();
+        // Validate current step before proceeding
+        if (validateCurrentStep()) {
+            currentStep++;
+            showStep(currentStep);
+            
+            // If moving to step 3, generate summary
+            if (currentStep === 3) {
+                generateSummary();
+            }
         }
     }
 }
@@ -176,14 +279,26 @@ function updateStepIndicators(step) {
     }
 }
 
-function skipUpload() {
-    console.log('Skipping upload step');
-    nextStep();
+function validateCurrentStep() {
+    if (currentStep === 1) {
+        // Step 1: PDF upload (optional)
+        return true;
+    } else if (currentStep === 2) {
+        // Step 2: Form validation
+        return validateForm();
+    }
+    return true;
 }
 
 // ============================================
 // PDF UPLOAD HANDLING
 // ============================================
+
+function handlePDFFile(input) {
+    if (input.files && input.files[0]) {
+        handlePDFUpload(input.files[0]);
+    }
+}
 
 function handlePDFUpload(file) {
     console.log('Handling PDF upload:', file.name);
@@ -200,46 +315,72 @@ function handlePDFUpload(file) {
     
     uploadedPDFFile = file;
     
-    // Show success state
+    // Update UI to show uploaded file
     const uploadContent = document.getElementById('upload-content');
-    const uploadSuccess = document.getElementById('upload-success');
+    const pdfPreview = document.getElementById('pdf-preview');
+    const pdfName = document.getElementById('pdf-name');
+    const pdfSize = document.getElementById('pdf-size');
     
-    if (uploadContent && uploadSuccess) {
-        uploadContent.classList.add('hidden');
-        uploadSuccess.classList.remove('hidden');
-        uploadSuccess.innerHTML = `
-            <div class="text-center">
-                <i class="fas fa-check-circle text-4xl text-green-500 mb-4"></i>
-                <p class="text-lg font-medium text-green-700 mb-2">PDF téléchargé avec succès!</p>
-                <p class="text-sm text-gray-600 mb-4">${file.name}</p>
-                <button type="button" onclick="resetUpload()" class="text-blue-600 hover:text-blue-800 text-sm">
-                    <i class="fas fa-times mr-1"></i>Supprimer
-                </button>
-            </div>
+    if (uploadContent && pdfPreview && pdfName && pdfSize) {
+        uploadContent.innerHTML = `
+            <i class="fas fa-check-circle text-4xl text-green-500 mb-4"></i>
+            <p class="text-green-600 mb-2 font-medium">PDF téléchargé avec succès!</p>
+            <p class="text-sm text-gray-500">${file.name}</p>
         `;
+        
+        pdfPreview.classList.remove('hidden');
+        pdfName.textContent = file.name;
+        pdfSize.textContent = formatFileSize(file.size);
     }
     
     console.log('PDF upload handled successfully');
 }
 
-function resetUpload() {
+function removePDF() {
     uploadedPDFFile = null;
     
     const uploadContent = document.getElementById('upload-content');
-    const uploadSuccess = document.getElementById('upload-success');
+    const pdfPreview = document.getElementById('pdf-preview');
     
-    if (uploadContent && uploadSuccess) {
-        uploadContent.classList.remove('hidden');
-        uploadSuccess.classList.add('hidden');
+    if (uploadContent) {
+        uploadContent.innerHTML = `
+            <i class="fas fa-cloud-upload-alt text-4xl text-gray-400 mb-4"></i>
+            <p class="text-gray-600 mb-2">Cliquez ici ou glissez-déposez votre PDF</p>
+            <p class="text-sm text-gray-500">Format accepté: PDF (Max 10MB)</p>
+        `;
+    }
+    
+    if (pdfPreview) {
+        pdfPreview.classList.add('hidden');
     }
     
     // Reset file input
-    const fileInput = document.getElementById('pdf-file-input');
+    const fileInput = document.getElementById('pdfFile');
     if (fileInput) {
         fileInput.value = '';
     }
     
-    console.log('Upload reset');
+    console.log('PDF removed');
+}
+
+function handlePDFDragOver(event) {
+    event.preventDefault();
+    event.currentTarget.classList.add('dragover');
+}
+
+function handlePDFDragLeave(event) {
+    event.preventDefault();
+    event.currentTarget.classList.remove('dragover');
+}
+
+function handlePDFDrop(event) {
+    event.preventDefault();
+    event.currentTarget.classList.remove('dragover');
+    
+    const files = event.dataTransfer.files;
+    if (files.length > 0) {
+        handlePDFUpload(files[0]);
+    }
 }
 
 // ============================================
@@ -251,42 +392,41 @@ async function loadInterventionNumber() {
         console.log('Loading intervention number...');
         
         const response = await fetch('/nodetest/api/intervention-number');
+        const result = await response.json();
         
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        
-        const data = await response.json();
-        console.log('Intervention number API response:', data);
+        console.log('Intervention number API response:', result);
         
         const numeroInput = document.getElementById('numero');
         if (numeroInput) {
-            // FIXED: Use data.number instead of data.nextNumber
-            if (data.number) {
-                numeroInput.value = data.number;
-                console.log('Intervention number set to:', data.number);
-            } else if (data.raw_number) {
-                // Fallback: format raw_number if number is missing
-                const formattedNumber = data.raw_number.toString().padStart(5, '0');
-                numeroInput.value = formattedNumber;
-                console.log('Intervention number set to (formatted):', formattedNumber);
-            } else {
-                // Final fallback: generate a basic number
-                numeroInput.value = '00001';
-                console.warn('Using fallback intervention number: 00001');
+            // Check different possible response formats
+            let number = null;
+            
+            if (result.success && result.number) {
+                number = result.number;
+            } else if (result.number) {
+                number = result.number;
+            } else if (typeof result === 'string') {
+                number = result;
             }
-        } else {
-            console.error('Numero input field not found');
+            
+            if (number) {
+                numeroInput.value = number;
+                console.log('Intervention number loaded:', number);
+            } else {
+                // Fallback: generate a simple number
+                const fallbackNumber = Date.now().toString().slice(-4);
+                numeroInput.value = fallbackNumber;
+                console.warn('Using fallback number:', fallbackNumber);
+            }
         }
-        
     } catch (error) {
         console.error('Error loading intervention number:', error);
-        
-        // Fallback: set a default number if API fails
+        // Fallback: generate a simple number
         const numeroInput = document.getElementById('numero');
         if (numeroInput) {
-            numeroInput.value = '00001';
-            console.log('Set fallback intervention number due to error');
+            const fallbackNumber = Date.now().toString().slice(-4);
+            numeroInput.value = fallbackNumber;
+            console.log('Using fallback number due to error:', fallbackNumber);
         }
     }
 }
@@ -331,23 +471,21 @@ async function loadInterventionTypes() {
     }
 }
 
-async function loadBusinesses() {
+async function loadAllBusinesses() {
     try {
+        console.log('Loading all businesses (fallback)...');
+        
         const response = await fetch('/nodetest/api/businesses');
-        const businesses = await response.json();
+        const result = await response.json();
         
         const affaireSelect = document.getElementById('affaire');
-        if (affaireSelect && Array.isArray(businesses)) {
-            businesses.forEach(business => {
-                const option = document.createElement('option');
-                option.value = business.uid;
-                option.textContent = business.name;
-                affaireSelect.appendChild(option);
-            });
-            console.log('Businesses loaded:', businesses.length);
+        if (affaireSelect && result.code === '1') {
+            // Don't populate by default - wait for user selection
+            // This is just for fallback/testing
+            console.log('All businesses available:', Object.keys(result.response).length - 1);
         }
     } catch (error) {
-        console.error('Error loading businesses:', error);
+        console.error('Error loading all businesses:', error);
     }
 }
 
@@ -412,10 +550,11 @@ async function loadClientsForBusiness() {
 function validateForm() {
     console.log('Validating form...');
     
-    // UPDATED: Removed 'technicien' and 'date' from required fields
+    // Updated required fields - REMOVED 'numero' since it's auto-generated and readonly
     const requiredFields = [
-        { id: 'numero', name: 'Numéro' },
         { id: 'titre', name: 'Titre' },
+        { id: 'intervention-status', name: 'Statut intervention' },
+        { id: 'business-type', name: 'Type d\'affaire' },
         { id: 'statut', name: 'Statut' },
         { id: 'type', name: 'Type' },
         { id: 'priorite', name: 'Priorité' },
@@ -426,40 +565,63 @@ function validateForm() {
         { id: 'description', name: 'Description' }
     ];
     
-    const errors = [];
+    let isValid = true;
+    let firstErrorField = null;
+    
+    // Special check for numero field - ensure it has a value
+    const numeroField = document.getElementById('numero');
+    if (numeroField && (!numeroField.value || numeroField.value.trim() === '' || numeroField.value === 'Auto-généré')) {
+        console.log('Numero field is empty, attempting to reload...');
+        loadInterventionNumber(); // Try to reload the number
+        
+        // Give it a fallback value if still empty
+        if (!numeroField.value || numeroField.value === 'Auto-généré') {
+            const fallbackNumber = Date.now().toString().slice(-4);
+            numeroField.value = fallbackNumber;
+            console.log('Set fallback numero:', fallbackNumber);
+        }
+    }
     
     for (const field of requiredFields) {
         const element = document.getElementById(field.id);
+        if (!element) {
+            console.warn(`Field ${field.id} not found`);
+            continue;
+        }
         
-        // Special handling for numero field
-        if (field.id === 'numero') {
-            if (!element || !element.value || element.value.trim() === '' || element.value === 'Auto-généré') {
-                errors.push(`${field.name} (non généré automatiquement)`);
+        // Remove previous error styling
+        element.classList.remove('border-red-500', 'bg-red-50');
+        
+        if (!element.value || element.value.trim() === '') {
+            // Add error styling
+            element.classList.add('border-red-500', 'bg-red-50');
+            
+            if (!firstErrorField) {
+                firstErrorField = element;
             }
-        } else {
-            if (!element || !element.value || element.value.trim() === '') {
-                errors.push(field.name);
-            }
+            
+            isValid = false;
+            console.log(`Validation failed for field: ${field.name}`);
         }
     }
     
-    // Validate price field (if provided, must be valid)
-    const priceInput = document.getElementById('prix');
-    if (priceInput && priceInput.value && priceInput.value.trim() !== '') {
-        const priceValue = parseFloat(priceInput.value);
-        if (isNaN(priceValue) || priceValue < 0) {
-            errors.push('Prix (doit être un nombre positif)');
+    if (!isValid) {
+        alert('Veuillez remplir tous les champs obligatoires marqués d\'un *');
+        
+        // Focus first error field and scroll to it
+        if (firstErrorField) {
+            firstErrorField.focus();
+            firstErrorField.scrollIntoView({ behavior: 'smooth', block: 'center' });
         }
     }
     
-    if (errors.length > 0) {
-        alert('Les champs suivants sont obligatoires ou invalides:\n' + errors.join('\n'));
-        return false;
-    }
-    
-    console.log('Form validation passed');
-    return true;
+    console.log('Form validation result:', isValid);
+    return isValid;
 }
+
+// ============================================
+// SUMMARY GENERATION
+// ============================================
 
 function generateSummary() {
     console.log('Generating summary...');
@@ -470,14 +632,15 @@ function generateSummary() {
     const fields = [
         { id: 'numero', label: 'Numéro' },
         { id: 'titre', label: 'Titre' },
+        { id: 'intervention-status', label: 'Statut intervention', getText: true },
+        { id: 'business-type', label: 'Type d\'affaire', getText: true },
         { id: 'statut', label: 'Statut', getText: true },
         { id: 'type', label: 'Type', getText: true },
-        { id: 'priorite', label: 'Priorité' },
+        { id: 'priorite', label: 'Priorité', getText: true },
         { id: 'affaire', label: 'Affaire', getText: true },
         { id: 'client', label: 'Client', getText: true },
         { id: 'technicien', label: 'Technicien', getText: true, optional: true },
-        { id: 'prix', label: 'Prix', formatter: (value) => value ? 
-            `${parseFloat(value).toFixed(2)} €` : 'Non spécifié', optional: true },
+        { id: 'prix', label: 'Prix', formatter: value => value ? `${parseFloat(value).toFixed(2)} €` : 'Non spécifié', optional: true },
         { id: 'adresse', label: 'Adresse' },
         { id: 'ville', label: 'Ville' },
         { id: 'immeuble', label: 'Immeuble', optional: true },
@@ -546,8 +709,6 @@ function generateSummary() {
 async function createIntervention() {
     console.log('Creating intervention...');
     
-    // Debug form data first
-    
     // Final validation
     if (!validateForm()) {
         return;
@@ -557,47 +718,51 @@ async function createIntervention() {
     const originalText = createBtn ? createBtn.textContent : '';
     
     try {
-        // Update button state
+        // Disable button and show loading state
         if (createBtn) {
             createBtn.textContent = 'Création en cours...';
             createBtn.disabled = true;
         }
         
-        // Prepare form data - ensure all fields have values (empty string for optional fields)
-        const submitData = {
-            numero: document.getElementById('numero').value || '',
-            titre: document.getElementById('titre').value || '',
-            description: document.getElementById('description').value || '',
-            priorite: document.getElementById('priorite').value || 'normale',
-            statut: document.getElementById('statut').value || '',
-            type: document.getElementById('type').value || '',
-            affaire: document.getElementById('affaire').value || '',
-            client: document.getElementById('client').value || '',
-            technicien: document.getElementById('technicien').value || 0,
-            prix: document.getElementById('prix').value || '',
-            adresse: document.getElementById('adresse').value || '',
-            ville: document.getElementById('ville').value || '',
-            immeuble: document.getElementById('immeuble').value || '',
-            etage: document.getElementById('etage').value || '',
-            appartement: document.getElementById('appartement').value || '',
-            date: document.getElementById('date').value || '',
-            heure_debut: document.getElementById('heure_debut').value || '',
-            heure_fin: document.getElementById('heure_fin').value || ''
-        };
+        // Collect form data
+        const formData = new FormData();
         
-        console.log('Submitting data:', submitData);
+        // Basic fields
+        formData.append('numero', document.getElementById('numero').value);
+        formData.append('titre', document.getElementById('titre').value);
+        formData.append('intervention_status', document.getElementById('intervention-status').value);
+        formData.append('business_type', document.getElementById('business-type').value);
+        formData.append('statut', document.getElementById('statut').value);
+        formData.append('type', document.getElementById('type').value);
+        formData.append('priorite', document.getElementById('priorite').value);
+        formData.append('affaire', document.getElementById('affaire').value);
+        formData.append('client', document.getElementById('client').value);
+        formData.append('technicien', document.getElementById('technicien').value);
+        formData.append('prix', document.getElementById('prix').value);
+        formData.append('adresse', document.getElementById('adresse').value);
+        formData.append('ville', document.getElementById('ville').value);
+        formData.append('immeuble', document.getElementById('immeuble').value);
+        formData.append('etage', document.getElementById('etage').value);
+        formData.append('appartement', document.getElementById('appartement').value);
+        formData.append('date', document.getElementById('date').value);
+        formData.append('heure_debut', document.getElementById('heure_debut').value);
+        formData.append('heure_fin', document.getElementById('heure_fin').value);
+        formData.append('description', document.getElementById('description').value);
+        
+        // Add PDF file if uploaded
+        if (uploadedPDFFile) {
+            formData.append('pdf', uploadedPDFFile);
+        }
+        
+        console.log('Form data prepared, sending request...');
         
         const response = await fetch('/nodetest/api/create-intervention', {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(submitData)
+            body: formData
         });
         
-        console.log('API response status:', response.status);
         const result = await response.json();
-        console.log('API response:', result);
+        console.log('Create intervention response:', result);
         
         if (result.success) {
             alert('Intervention créée avec succès!');
@@ -618,6 +783,51 @@ async function createIntervention() {
         }
     }
 }
+
+// ============================================
+// UTILITY FUNCTIONS
+// ============================================
+
+function formatFileSize(bytes) {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+}
+
+function showNotification(message, type) {
+    // Create notification element
+    const notification = document.createElement('div');
+    notification.className = `fixed top-4 right-4 px-6 py-3 rounded-lg shadow-lg z-50 ${
+        type === 'success' ? 'bg-green-500 text-white' :
+        type === 'warning' ? 'bg-yellow-500 text-white' :
+        type === 'error' ? 'bg-red-500 text-white' :
+        'bg-blue-500 text-white'
+    }`;
+    
+    const icon = type === 'success' ? 'fa-check-circle' :
+                type === 'warning' ? 'fa-exclamation-triangle' :
+                type === 'error' ? 'fa-exclamation-circle' :
+                'fa-info-circle';
+    
+    notification.innerHTML = `
+        <div class="flex items-center">
+            <i class="fas ${icon} mr-2"></i>
+            <span>${message}</span>
+        </div>
+    `;
+    
+    document.body.appendChild(notification);
+    
+    // Auto remove after 3 seconds
+    setTimeout(() => {
+        if (notification.parentNode) {
+            notification.parentNode.removeChild(notification);
+        }
+    }, 3000);
+}
+
 // ============================================
 // GLOBAL EXPORTS
 // ============================================
@@ -625,9 +835,9 @@ async function createIntervention() {
 // Make functions available globally for onclick handlers
 window.nextStep = nextStep;
 window.prevStep = prevStep;
-window.skipUpload = skipUpload;
-window.resetUpload = resetUpload;
+window.removePDF = removePDF;
+window.handlePDFFile = handlePDFFile;
 window.createIntervention = createIntervention;
 window.loadClientsForBusiness = loadClientsForBusiness;
 
-console.log('createIntervention.js loaded successfully');
+console.log('createIntervention.js loaded successfully with business separation');

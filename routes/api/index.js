@@ -1,4 +1,4 @@
-// routes/api/index.js - Updated with file upload middleware
+// routes/api/index.js - Updated with business filtering for maintenance/chantier separation
 
 const express = require('express');
 const router = express.Router();
@@ -18,7 +18,7 @@ router.use(fileUpload({
     createParentPath: true
 }));
 
-// API Routes
+// Basic API Routes
 router.get('/test-db', testController.testDatabase);
 router.get('/stats', statsController.getStats);
 router.get('/urgent', interventionsController.getUrgent);
@@ -53,8 +53,15 @@ router.get('/debug-dropdowns', interventionsController.debugDropdownData);
 router.get('/intervention-number', interventionsController.getInterventionNumber);
 router.get('/intervention-statuses', interventionsController.getInterventionStatuses);
 router.get('/intervention-types', interventionsController.getInterventionTypes);
-router.get('/businesses', interventionsController.getBusinesses);
+
+// EXISTING business/client routes (now with fixed number display)
+router.get('/businesses', interventionsController.getBusinesses); // Now shows "104 - Business Title"
 router.get('/clients', interventionsController.getClients);
+
+// NEW: Business filtering routes for maintenance/chantier separation
+router.post('/get-businesses-by-status-and-type', interventionsController.getBusinessesByStatusAndType);
+router.get('/business-categories', interventionsController.getBusinessCategories);
+router.get('/businesses-array', interventionsController.getBusinessesArray); // Alternative format
 
 // CREATE INTERVENTION - with file upload support
 router.post('/create-intervention', interventionsController.createIntervention);
