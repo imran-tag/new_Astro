@@ -84,4 +84,9 @@ router.use('/nodetest/generated', express.static(path.join(__dirname, '../genera
 // API routes
 router.use('/nodetest/api', apiRoutes);
 
+router.get('/nodetest/chantiers-simple', (req, res) => {
+    const { getSimpleChantiersHTML } = require('../views/simpleChantiers');
+    res.send(getSimpleChantiersHTML());
+});
+
 module.exports = router;

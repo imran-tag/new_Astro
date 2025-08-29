@@ -1,4 +1,4 @@
-// views/dashboard.js - Enhanced HTML template with colors, icons, and tooltips
+// views/dashboard.js - Enhanced HTML template with colors, icons, and chantiers dashboard link
 
 function getDashboardHTML() {
     return `<!DOCTYPE html>
@@ -47,7 +47,7 @@ function getHeaderHTML() {
 function getMainContentHTML() {
     return `
     <main class="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
-        <!-- Titre du Tableau de Bord avec bouton Nouvelle Intervention -->
+        <!-- Titre du Tableau de Bord avec boutons -->
         <div class="mb-8">
             <div class="flex justify-between items-center">
                 <div>
@@ -55,6 +55,11 @@ function getMainContentHTML() {
                     <p class="text-gray-600 mt-2">Vue d'ensemble de vos interventions techniques</p>
                 </div>
                 <div class="flex space-x-3">
+                    <!-- NEW: Chantiers Dashboard Link -->
+                    <a href="/nodetest/chantiers-simple" class="inline-flex items-center px-4 py-2 bg-orange-600 text-white rounded-md hover:bg-orange-700 transition-colors">
+                        <i class="fas fa-hard-hat mr-2"></i>
+                        Dashboard Chantiers
+                    </a>
                     <a href="/nodetest/create-intervention" class="inline-flex items-center px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors">
                         <i class="fas fa-plus mr-2"></i>
                         Nouvelle Intervention
@@ -63,6 +68,31 @@ function getMainContentHTML() {
                         <i class="fas fa-sync-alt mr-2"></i>
                         Actualiser
                     </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Info Banner about Chantiers Dashboard -->
+        <div class="mb-6">
+            <div class="bg-orange-50 border border-orange-200 rounded-lg p-4">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                        <i class="fas fa-info-circle text-orange-500 text-lg"></i>
+                    </div>
+                    <div class="ml-3">
+                        <h3 class="text-sm font-medium text-orange-800">
+                            Nouveau : Dashboard Chantiers disponible
+                        </h3>
+                        <p class="text-sm text-orange-700 mt-1">
+                            Consultez le <a href="/nodetest/chantiers-simple" class="font-medium underline hover:text-orange-900">dashboard dédié aux chantiers</a> 
+                            pour voir les interventions groupées par chantier avec des filtres avancés.
+                        </p>
+                    </div>
+                    <div class="ml-auto">
+                        <button onclick="this.parentElement.parentElement.parentElement.style.display='none'" class="text-orange-400 hover:text-orange-600">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -225,7 +255,7 @@ function getMainContentHTML() {
                         </thead>
                         <tbody id="filtered-table" class="bg-white divide-y divide-gray-200">
                             <tr>
-                                <td colspan="8" class="px-6 py-4 text-center text-gray-500">Chargement...</td>
+                                <td colspan="9" class="px-6 py-4 text-center text-gray-500">Chargement...</td>
                             </tr>
                         </tbody>
                     </table>
@@ -300,7 +330,7 @@ function getMainContentHTML() {
                         </thead>
                         <tbody id="recent-table" class="bg-white divide-y divide-gray-200">
                             <tr>
-                                <td colspan="8" class="px-6 py-4 text-center text-gray-500">Chargement...</td>
+                                <td colspan="9" class="px-6 py-4 text-center text-gray-500">Chargement...</td>
                             </tr>
                         </tbody>
                     </table>

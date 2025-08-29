@@ -71,9 +71,6 @@ router.post('/get-businesses-by-status-and-type', interventionsController.getBus
 router.get('/business-categories', interventionsController.getBusinessCategories);
 router.get('/businesses-array', interventionsController.getBusinessesArray); // Alternative format
 
-router.get('/chantiers-only', interventionsController.getChantiersOnly);
-
-
 // CREATE INTERVENTION - with file upload support
 router.post('/create-intervention', interventionsController.createIntervention);
 
@@ -374,46 +371,7 @@ router.get('/chantiers/:chantier_uid/interventions', (req, res) => {
         }
     });
 });
-// The issue is that the chantiers API routes aren't properly registered.
-// You need to add the chantiers routes to your routes/api/index.js
 
-// Add these lines to your routes/api/index.js file, right before the module.exports line:
-
-// CHANTIERS API ROUTES - Add these to routes/api/index.js
-router.get('/chantiers/stats', (req, res) => {
-    console.log('Chantiers stats endpoint hit');
-    
-    // Import and call the controller here to avoid import issues
-    try {
-        const chantiersController = require('../../controllers/chantiersController');
-        chantiersController.getChantiersStats(req, res);
-    } catch (error) {
-        console.error('Error loading chantiers controller:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Chantiers controller not found'
-        });
-    }
-});
-
-router.get('/chantiers/:chantier_uid/interventions', (req, res) => {
-    console.log('Chantier interventions endpoint hit for:', req.params.chantier_uid);
-    
-    // Import and call the controller here to avoid import issues
-    try {
-        const chantiersController = require('../../controllers/chantiersController');
-        chantiersController.getChantierInterventions(req, res);
-    } catch (error) {
-        console.error('Error loading chantiers controller:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Chantiers controller not found',
-            error: error.message
-        });
-    }
-});
-
-// Add these lines BEFORE the module.exports line in your routes/api/index.js
 // Add this line BEFORE the module.exports line in your routes/api/index.js
 // Add this before module.exports in your routes/api/index.js
 

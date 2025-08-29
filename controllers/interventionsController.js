@@ -653,6 +653,79 @@ exports.generateQuitus = async (req, res) => {
     }
 };
 
+
+exports.getChantiersOnly = async (req, res) => {
+    try {
+        const connection = await pool.getConnection();
+        
+        try {
+            // Use the exact same query as getRecent, but filter for chantier business numbers
+            const chantierNumbers = [144, 146, 150, 155, 156, 157, 158, 159, 160, 162, 163, 164, 165, 166, 167, 168, 169, 170, 171, 172, 173, 175, 176, 177, 178, 179, 180, 181, 182, 183, 184];
+            const placeholders = chantierNumbers.map(() => '?').join(',');
+            
+            const query = `
+                SELECT 
+                    i.number as intervention_id,
+                    i.title,
+                    CASE 
+                        WHEN i.address IS NOT NULL AND i.address != '' THEN CONCAT(i.address, CASE WHEN i.city IS NOT NULL AND i.city != '' THEN CONCAT(', ', i.city) ELSE '' END)
+                        ELSE 'Adresse non définie'
+                    END as address,
+                    i.description,
+                    ist.name as status,
+                    i.priority,
+                    i.date_time,
+                    i.price,
+                    CASE 
+                        WHEN i.technician_uid = 0 OR i.technician_uid IS NULL THEN 'Non assigné'
+                        ELSE CONCAT(tech.firstname, ' ', tech.lastname)
+                    END as assigned_to,
+                    COALESCE(b.number, 'N/A') as business_number,
+                    COALESCE(b.title, 'Titre inconnu') as business_title,
+                    i.business_uid
+                FROM interventions i
+                LEFT JOIN interventions_status ist ON i.status_uid = ist.uid
+                LEFT JOIN technicians tech ON i.technician_uid = tech.uid
+                LEFT JOIN businesses b ON i.business_uid = b.uid
+                WHERE i.uid != 0 
+                    AND i.agency_uid = 1 
+                    AND b.number IS NOT NULL
+                    AND CAST(b.number AS UNSIGNED) IN (${placeholders})
+                ORDER BY b.number, i.timestamp DESC 
+                LIMIT 2000
+            `;
+            
+            console.log('Executing chantiers query...');
+            const [chantiers] = await connection.execute(query, chantierNumbers);
+            
+            console.log(`Found ${chantiers.length} interventions across chantiers`);
+            
+            // Debug: Log unique business numbers found
+            const uniqueBusinessNumbers = [...new Set(chantiers.map(c => c.business_number))];
+            console.log('Unique business numbers found:', uniqueBusinessNumbers);
+            
+            // Debug: Log sample data
+            if (chantiers.length > 0) {
+                console.log('Sample intervention data:');
+                console.log('First intervention:', {
+                    business_number: chantiers[0].business_number,
+                    business_title: chantiers[0].business_title,
+                    intervention_id: chantiers[0].intervention_id,
+                    title: chantiers[0].title
+                });
+            }
+            
+            res.json(chantiers);
+        } finally {
+            connection.release();
+        }
+        
+    } catch (error) {
+        console.error('Chantiers error:', error);
+        res.status(500).json([]);
+    }
+};
+
 // Helper function to generate Rapport PDF content - Following old_Astro exactly
 async function generateRapportPDF(doc, interventionData) {
     try {
